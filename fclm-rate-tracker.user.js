@@ -9,6 +9,9 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @connect      fclm-portal.amazon.com
+// @exclude      *://fclm-portal.amazon.com/employee/timeDetails*
+// @exclude      *://fclm-portal.amazon.com/reports/ppaTimeOnTask*
+// @exclude      *://fclm-portal.amazon.com/employee/ppaTimeDetails*
 // ==/UserScript==
 
 (function () {
@@ -340,10 +343,17 @@
     '</div>',
   ].join('');
 
+  // ── Tab (minimized state) ────────────────────────────────────────────────
+  var tab = document.createElement('div');
+  tab.id = 'fclm-rt-tab';
+  tab.style.cssText = 'position:fixed;right:0;top:100px;width:28px;height:120px;background:#161b22;border:1px solid #21262d;border-right:none;border-radius:8px 0 0 8px;cursor:pointer;display:none;z-index:2147483647;align-items:center;justify-content:center;writing-mode:vertical-rl;font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;user-select:none;';
+  tab.textContent = '\ud83d\udcca RPND Rates';
+
   // ── Mount ────────────────────────────────────────────────────────────────
   function mount() {
     if (!document.body) { setTimeout(mount, 100); return; }
     document.body.appendChild(panel);
+    document.body.appendChild(tab);
     init();
   }
   mount();
@@ -361,19 +371,13 @@
     });
 
     document.getElementById('fclm-min-btn').addEventListener('click', function () {
-      var body     = document.getElementById('fclm-body');
-      var settings = document.getElementById('fclm-settings');
-      var btn      = document.getElementById('fclm-min-btn');
-      var title    = document.getElementById('fclm-title');
-      var gear     = document.getElementById('fclm-gear');
-      var collapsed = body.style.display === 'none';
-      body.style.display     = collapsed ? 'block' : 'none';
-      settings.style.display = 'none';
-      btn.textContent        = collapsed ? '−' : '+';
-      // Shrink panel to slim pill when minimized
-      panel.style.width      = collapsed ? '400px' : '160px';
-      if (title) title.style.display = collapsed ? 'block' : 'none';
-      if (gear)  gear.style.display  = collapsed ? 'inline' : 'none';
+      document.getElementById('fclm-settings').style.display = 'none';
+      panel.style.display = 'none';
+      tab.style.display   = 'flex';
+    });
+    tab.addEventListener('click', function () {
+      tab.style.display   = 'none';
+      panel.style.display = 'block';
     });
 
     // ── Drag ──────────────────────────────────────────────────────────────
