@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RPND Rate Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Floating overlay — Decant, Decant Non-TI, Prep, Each Receive rates from FCLM
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-rate-tracker.user.js
@@ -19,7 +19,7 @@
 (function () {
   'use strict';
 
-  const WH = 'RFD2';
+  const WH = () => cfg.wh;
   const REFRESH_MS = 60000;
   const INTRA_TAIL =
     '&startHourIntraday1=0&startMinuteIntraday1=0' +
@@ -40,6 +40,7 @@
     tPrep:       GM_getValue('tPrep',       ''),
     tEachRecv:   GM_getValue('tEachRecv',   ''),
     autoRefresh: GM_getValue('autoRefresh', true),
+    wh:          GM_getValue('wh', ''),
   };
 
   let rates     = { decant:{rate:null,units:null,hours:null}, decantNTI:{rate:null,units:null,hours:null}, prep:{rate:null,units:null,hours:null}, eachRecv:{rate:null,units:null,hours:null} };
@@ -55,7 +56,7 @@
   // ── URL builders ─────────────────────────────────────────────────────────
   function buildPPR() {
     return 'https://fclm-portal.amazon.com/reports/processPathRollup?' +
-      'reportFormat=HTML&warehouseId=' + WH + '&maxIntradayDays=1&spanType=Intraday' +
+      'reportFormat=HTML&warehouseId=' + WH() + '&maxIntradayDays=1&spanType=Intraday' +
       '&startDateIntraday=' + enc(cfg.startDate) + '&startHourIntraday=' + cfg.startHour + '&startMinuteIntraday=' + cfg.startMin +
       '&endDateIntraday='   + enc(cfg.endDate)   + '&endHourIntraday='   + cfg.endHour  + '&endMinuteIntraday='   + cfg.endMin +
       '&_adjustPlanHours=on&_hideEmptyLineItems=on&_rememberViewForWarehouse=on&employmentType=AllEmployees' + INTRA_TAIL;
@@ -64,7 +65,7 @@
 
   function buildRollup(pid) {
     return 'https://fclm-portal.amazon.com/reports/functionRollup?' +
-      'reportFormat=HTML&warehouseId=' + WH + '&processId=' + pid + '&maxIntradayDays=1&spanType=Intraday' +
+      'reportFormat=HTML&warehouseId=' + WH() + '&processId=' + pid + '&maxIntradayDays=1&spanType=Intraday' +
       '&startDateIntraday=' + enc(cfg.startDate) + '&startHourIntraday=' + cfg.startHour + '&startMinuteIntraday=' + cfg.startMin +
       '&endDateIntraday='   + enc(cfg.endDate)   + '&endHourIntraday='   + cfg.endHour  + '&endMinuteIntraday='   + cfg.endMin +
       INTRA_TAIL;
@@ -251,6 +252,7 @@
     cfg.endDate    = fromInput(document.getElementById('fclm-edate').value) || cfg.endDate;
     cfg.endHour    = parseInt(document.getElementById('fclm-ehour').value,  10) || 0;
     cfg.endMin     = parseInt(document.getElementById('fclm-emin').value,   10) || 0;
+    cfg.wh         = document.getElementById('fclm-wh').value.toUpperCase() || cfg.wh;
     cfg.tDecant    = document.getElementById('fclm-t-decant').value;
     cfg.tDecantNTI = document.getElementById('fclm-t-decantNTI').value;
     cfg.tPrep      = document.getElementById('fclm-t-prep').value;
@@ -301,6 +303,10 @@
     '</div>',
 
     '<div id="fclm-settings" style="display:none;padding:12px 14px;border-bottom:1px solid #21262d;background:#0d1117;">',
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">',
+        '<div style="font-weight:900;font-size:11px;color:#484f58;white-space:nowrap;">Site ID</div>',
+        '<input id="fclm-wh" type="text" maxlength="8" value="' + cfg.wh + '" placeholder="e.g. RFD2" style="' + S_INP + 'text-transform:uppercase;">',
+      '</div>',
       '<div style="font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#30363d;margin-bottom:8px;">Shift Window</div>',
       '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">',
         '<span style="font-weight:900;width:34px;font-size:11px;color:#484f58;">Start</span>',
