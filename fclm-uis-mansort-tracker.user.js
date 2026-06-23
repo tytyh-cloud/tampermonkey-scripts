@@ -17,7 +17,7 @@
 (function () {
   'use strict';
 
-  const WH = 'RFD2';
+  const WH = () => cfg.wh;
   const REFRESH_MS = 60000;
   const INTRA_TAIL =
     '&startHourIntraday1=0&startMinuteIntraday1=0' +
@@ -37,6 +37,7 @@
     t20lb:       GM_getValue('ums_t20lb',       ''),
     tManSort:    GM_getValue('ums_tManSort',    ''),
     autoRefresh: GM_getValue('ums_autoRefresh', true),
+    wh:          GM_getValue('ums_wh', ''),
   };
 
   let rates = {
@@ -57,7 +58,7 @@
   // ── URL builder ──────────────────────────────────────────────────────────
   function buildURL() {
     return 'https://fclm-portal.amazon.com/reports/functionRollup?' +
-      'reportFormat=HTML&warehouseId=' + WH + '&processId=1003009&maxIntradayDays=1&spanType=Intraday' +
+      'reportFormat=HTML&warehouseId=' + WH() + '&processId=1003009&maxIntradayDays=1&spanType=Intraday' +
       '&startDateIntraday=' + enc(cfg.startDate) + '&startHourIntraday=' + cfg.startHour + '&startMinuteIntraday=' + cfg.startMin +
       '&endDateIntraday='   + enc(cfg.endDate)   + '&endHourIntraday='   + cfg.endHour  + '&endMinuteIntraday='   + cfg.endMin +
       INTRA_TAIL;
@@ -212,6 +213,7 @@
     cfg.endDate    = fromInput(document.getElementById('ums-edate').value) || cfg.endDate;
     cfg.endHour    = parseInt(document.getElementById('ums-ehour').value, 10) || 0;
     cfg.endMin     = parseInt(document.getElementById('ums-emin').value,  10) || 0;
+    cfg.wh         = document.getElementById('ums-wh').value.toUpperCase() || cfg.wh;
     cfg.t5lb       = document.getElementById('ums-t-5lb').value;
     cfg.t20lb      = document.getElementById('ums-t-20lb').value;
     cfg.tManSort   = document.getElementById('ums-t-mansort').value;
@@ -261,6 +263,10 @@
     '</div>',
 
     '<div id="ums-settings" style="display:none;padding:12px 14px;border-bottom:1px solid #21262d;background:#0d1117;">',
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">',
+        '<div style="font-weight:900;font-size:11px;color:#484f58;white-space:nowrap;">Site ID</div>',
+        '<input id="ums-wh" type="text" maxlength="8" value="' + cfg.wh + '" placeholder="e.g. RFD2" style="' + S_INP + 'text-transform:uppercase;">',
+      '</div>',
       '<div style="font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#30363d;margin-bottom:8px;">Shift Window</div>',
       '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px;">',
         '<span style="font-weight:900;width:34px;font-size:11px;color:#484f58;">Start</span>',
