@@ -44,6 +44,7 @@
     uis20lb: { rate: null, units: null, hours: null },
     manSort: { rate: null, units: null, hours: null },
   };
+  let rcSortVol  = null;
   let lastUpdated = null;
   let refreshTimer = null;
   let fetching = false;
@@ -72,8 +73,7 @@
     }));
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
-  // Return the nth numeric value (0-based) from a table row, skipping non-numeric cells.
+  // ── Helpers ──────────────────────────────────────────────────────────────
   function nthNum(row, n) {
     var cells = row.querySelectorAll('td');
     var count = 0;
@@ -85,10 +85,6 @@
   }
 
   // ── Parser ───────────────────────────────────────────────────────────────
-  // Every Total row has this numeric pattern (one active activity group):
-  //   [0] Total Paid Hours  [1] Jobs  [2] JPH  [3] EACH UNIT  [4] EACH UPH
-  // Empty cells in inactive groups are NaN and are skipped by nthNum.
-  // This works for both UIS (ItemInducted active) and RC Sort (PresortItemSc active).
   function parseFunctionRow(html, fnName) {
     var doc = new DOMParser().parseFromString(html, 'text/html');
     var tables = doc.querySelectorAll('table');
@@ -102,16 +98,12 @@
         if (rows[r].textContent.toLowerCase().indexOf(fnName.toLowerCase()) >= 0) foundFn = true;
         if (!foundFn) continue;
         if (cells[0].textContent.trim() !== 'Total') continue;
-        var rate  = nthNum(rows[r], 4); // 5th numeric = EACH UPH
-        var units = nthNum(rows[r], 3); // 4th numeric = EACH UNIT
-        var hours = nthNum(rows[r], 0); // 1st numeric = Total Paid Hours
-        if (rate !== null) {
-          console.log('[FCLM UMS] ' + fnName + ' UPH=' + rate + ' units=' + units + ' hrs=' + hours);
-          return { rate: rate, units: units, hours: hours };
-        }
+        var rate  = nthNum(rows[r], 4);
+        var units = nthNum(rows[r], 3);
+        var hours = nthNum(rows[r], 0);
+        if (rate !== null) return { rate: rate, units: units, hours: hours };
       }
     }
-    console.log('[FCLM UMS] ' + fnName + ': Total row not found');
     return { rate: null, units: null, hours: null };
   }
 
@@ -126,7 +118,7 @@
     return              { bg: 'rgba(239,68,68,0.13)',   border: '#ef4444', val: '#f87171', pct: Math.round(p * 100) + '%' };
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // ── Render cards ─────────────────────────────────────────────────────────
   function renderCard(id, rate, units, hours, target, label, extraStyle) {
     var el = document.getElementById('ums-c-' + id);
     if (!el) return;
@@ -144,10 +136,20 @@
       '<div style="font-size:12px;font-weight:900;color:' + c.val + ';margin-top:2px;">' + c.pct + '</div>';
   }
 
+  function renderRCSortVol() {
+    var el = document.getElementById('ums-rc-vol');
+    if (!el) return;
+    el.innerHTML =
+      '<div style="font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;margin-bottom:4px;">RC Sort — Total Vol</div>' +
+      '<div style="font-size:22px;font-weight:900;color:#cbd5e1;line-height:1.1;">' + (rcSortVol !== null ? rcSortVol.toLocaleString() : '—') + '</div>' +
+      '<div style="font-weight:900;font-size:10px;color:#94a3b8;margin-top:1px;">units processed</div>';
+  }
+
   function renderAll() {
     renderCard('uis5lb',  rates.uis5lb.rate,  rates.uis5lb.units,  rates.uis5lb.hours,  cfg.t5lb,     'UIS 5LB');
     renderCard('uis20lb', rates.uis20lb.rate, rates.uis20lb.units, rates.uis20lb.hours, cfg.t20lb,    'UIS 20LB');
     renderCard('manSort', rates.manSort.rate, rates.manSort.units, rates.manSort.hours, cfg.tManSort, 'MS Rate', 'grid-column:1/-1;');
+    renderRCSortVol();
   }
 
   // ── Fetch ────────────────────────────────────────────────────────────────
@@ -159,9 +161,28 @@
     if (btn) btn.disabled = true;
     try {
       var html = await httpGet(buildURL());
-      rates.uis5lb  = parseFunctionRow(html, 'UIS_5lb_SCP_Induct');
-      rates.uis20lb = parseFunctionRow(html, 'UIS_20lb_SCP_Induct');
+      var _scp5 = parseFunctionRow(html, 'UIS_5lb_SCP_Induct');
+      var _ind5 = parseFunctionRow(html, 'UIS_5lb_Induct');
+      var _u5 = (_scp5.units || 0) + (_ind5.units || 0);
+      var _h5 = (_scp5.hours || 0) + (_ind5.hours || 0);
+      rates.uis5lb = {
+        units: _u5 || null,
+        hours: _h5 || null,
+        rate:  (_u5 && _h5) ? _u5 / _h5 : (_scp5.rate || _ind5.rate),
+      };
+      var _scp = parseFunctionRow(html, 'UIS_20lb_SCP_Induct');
+      var _ind = parseFunctionRow(html, 'UIS_20lb_Induct');
+      var _u20 = (_scp.units || 0) + (_ind.units || 0);
+      var _h20 = (_scp.hours || 0) + (_ind.hours || 0);
+      rates.uis20lb = {
+        units: _u20 || null,
+        hours: _h20 || null,
+        rate:  (_u20 && _h20) ? _u20 / _h20 : (_scp.rate || _ind.rate),
+      };
       rates.manSort = parseFunctionRow(html, 'RC Sort Primary');
+      // RC Sort total vol = sum of all 3 card units
+      var _v = (rates.uis5lb.units || 0) + (rates.uis20lb.units || 0) + (rates.manSort.units || 0);
+      rcSortVol = _v || null;
       lastUpdated = new Date();
       renderAll();
       setStatus('Updated ' + lastUpdated.toLocaleTimeString());
@@ -272,6 +293,7 @@
         '<div id="ums-c-uis5lb"  style="border-radius:8px;padding:10px;min-height:96px;"></div>',
         '<div id="ums-c-uis20lb" style="border-radius:8px;padding:10px;min-height:96px;"></div>',
         '<div id="ums-c-manSort" style="border-radius:8px;padding:12px 14px;min-height:130px;grid-column:1/-1;"></div>',
+        '<div id="ums-rc-vol" style="grid-column:1/-1;background:rgba(71,85,105,0.15);border:1px solid #334155;border-radius:8px;padding:10px;"></div>',
       '</div>',
       '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px 12px;border-top:1px solid #21262d;">',
         '<button id="ums-fetch" style="' + S_BTN('#1f6feb','#388bfd') + 'padding:5px 12px;">⟳ Fetch Now</button>',
