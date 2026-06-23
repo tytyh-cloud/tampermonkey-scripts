@@ -36,6 +36,7 @@
     t5lb:        GM_getValue('ums_t5lb',        ''),
     t20lb:       GM_getValue('ums_t20lb',       ''),
     tManSort:    GM_getValue('ums_tManSort',    ''),
+    tVol:        GM_getValue('ums_tVol',        ''),
     autoRefresh: GM_getValue('ums_autoRefresh', true),
     wh:          GM_getValue('ums_wh', ''),
   };
@@ -140,10 +141,27 @@
   function renderRCSortVol() {
     var el = document.getElementById('ums-rc-vol');
     if (!el) return;
+    var t = parseFloat(cfg.tVol);
+    var hasTgt = rcSortVol !== null && t && !isNaN(t);
+    var p = hasTgt ? rcSortVol / t : null;
+    var col = '#cbd5e1';
+    var bg  = 'rgba(71,85,105,0.15)';
+    var bdr = '#334155';
+    var pct = '';
+    if (p !== null) {
+      if (p >= 1.00) { col = '#4ade80'; bg = 'rgba(34,197,94,0.13)';  bdr = '#22c55e'; }
+      else if (p >= 0.85) { col = '#fbbf24'; bg = 'rgba(245,158,11,0.13)'; bdr = '#f59e0b'; }
+      else { col = '#f87171'; bg = 'rgba(239,68,68,0.13)'; bdr = '#ef4444'; }
+      pct = Math.round(p * 100) + '%';
+    }
+    el.style.background = bg;
+    el.style.borderColor = bdr;
     el.innerHTML =
       '<div style="font-weight:900;font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;margin-bottom:4px;">RC Sort — Total Vol</div>' +
-      '<div style="font-size:22px;font-weight:900;color:#cbd5e1;line-height:1.1;">' + (rcSortVol !== null ? rcSortVol.toLocaleString() : '—') + '</div>' +
-      '<div style="font-weight:900;font-size:10px;color:#94a3b8;margin-top:1px;">units processed</div>';
+      '<div style="font-size:22px;font-weight:900;color:' + col + ';line-height:1.1;">' + (rcSortVol !== null ? rcSortVol.toLocaleString() : '—') + '</div>' +
+      '<div style="font-weight:900;font-size:10px;color:#94a3b8;margin-top:1px;">units processed</div>' +
+      '<div style="font-weight:900;margin-top:4px;font-size:11px;color:#cbd5e1;">Goal: <span style="color:' + col + ';">' + (t ? t.toLocaleString() : 'Not set') + '</span></div>' +
+      (pct ? '<div style="font-size:12px;font-weight:900;color:' + col + ';margin-top:2px;">' + pct + '</div>' : '');
   }
 
   function renderAll() {
@@ -217,6 +235,7 @@
     cfg.t5lb       = document.getElementById('ums-t-5lb').value;
     cfg.t20lb      = document.getElementById('ums-t-20lb').value;
     cfg.tManSort   = document.getElementById('ums-t-mansort').value;
+    cfg.tVol       = document.getElementById('ums-t-vol').value;
     Object.keys(cfg).forEach(function(k) { GM_setValue('ums_' + k, cfg[k]); });
     renderAll();
     fetchAll();
@@ -290,6 +309,8 @@
         '<input id="ums-t-20lb"    type="number" value="' + cfg.t20lb    + '" placeholder="e.g. 570"  style="' + S_INP + '"></div>',
         '<div style="grid-column:1/-1"><div style="font-weight:900;font-size:11px;color:#484f58;margin-bottom:3px;">MS Rate</div>',
         '<input id="ums-t-mansort" type="number" value="' + cfg.tManSort + '" placeholder="e.g. 300"  style="' + S_INP + '"></div>',
+        '<div style="grid-column:1/-1"><div style="font-weight:900;font-size:11px;color:#484f58;margin-bottom:3px;">Total Vol Goal</div>',
+        '<input id="ums-t-vol" type="number" value="' + cfg.tVol + '" placeholder="e.g. 400000" style="' + S_INP + '"></div>',
       '</div>',
       '<button id="ums-apply" style="' + S_BTN('#1f6feb','#388bfd') + 'padding:6px 0;width:100%;">✓ Apply Changes</button>',
     '</div>',
