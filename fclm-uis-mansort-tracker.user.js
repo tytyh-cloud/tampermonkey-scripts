@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM UIS / ManSort Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Floating overlay — UIS 5LB, UIS 20LB, ManSort rates from FCLM
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-uis-mansort-tracker.user.js
@@ -88,26 +88,56 @@
     return null;
   }
 
-  // ── Parser ───────────────────────────────────────────────────────────────
+  // ── Parser ─────────────────────────────────────────────────────────────────────────
+  // Parse HTML once and cache the doc -- avoids re-parsing 4x for one fetch.
+  var _cachedDoc  = null;
+  var _cachedHtml = null;
+  function getDoc(html) {
+    if (html !== _cachedHtml) {
+      _cachedDoc  = new DOMParser().parseFromString(html, 'text/html');
+      _cachedHtml = html;
+    }
+    return _cachedDoc;
+  }
+
+  // Find the Total row for a named function section on the rollup page.
+  // Column layout: [Size/Total] [Paid Hrs #1] [Jobs #2] [JPH #3] [Each Units #4] [Each UPH #5]
+  // Each UPH = 5th numeric (index 4), Each Units = 4th (index 3), Hrs = 1st (index 0).
+  // Uses ANY-cell Total detection (matches RPND tracker behaviour).
   function parseFunctionRow(html, fnName) {
-    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var doc    = getDoc(html);
+    var needle = fnName.toLowerCase();
     var tables = doc.querySelectorAll('table');
     for (var t = 0; t < tables.length; t++) {
-      if (tables[t].textContent.toLowerCase().indexOf(fnName.toLowerCase()) < 0) continue;
+      if (tables[t].textContent.toLowerCase().indexOf(needle) < 0) continue;
       var rows = tables[t].querySelectorAll('tr');
-      var foundFn = false;
+      var inSection = false;
       for (var r = 0; r < rows.length; r++) {
         var cells = rows[r].querySelectorAll('td');
         if (!cells.length) continue;
-        if (rows[r].textContent.toLowerCase().indexOf(fnName.toLowerCase()) >= 0) foundFn = true;
-        if (!foundFn) continue;
-        if (cells[0].textContent.trim() !== 'Total') continue;
-        var rate  = nthNum(rows[r], 4);
-        var units = nthNum(rows[r], 3);
-        var hours = nthNum(rows[r], 0);
+        var rowText = rows[r].textContent.toLowerCase();
+        // Section header: row contains the function name AND no 'total' text.
+        // Reset inSection on new header to prevent cross-section bleed.
+        if (rowText.indexOf(needle) >= 0 && rowText.indexOf('total') < 0) {
+          inSection = true;
+          continue;
+        }
+        if (!inSection) continue;
+        // Check any cell for exact 'Total' text (matches RPND tracker approach).
+        var hasTotal = false;
+        for (var c = 0; c < cells.length; c++) {
+          if (cells[c].textContent.trim() === 'Total') { hasTotal = true; break; }
+        }
+        if (!hasTotal) continue;
+        var rate  = nthNum(rows[r], 4); // 5th numeric = Each UPH
+        var units = nthNum(rows[r], 3); // 4th numeric = Each Units
+        var hours = nthNum(rows[r], 0); // 1st numeric = Total Paid Hrs
+        console.log('[FCLM UMS] ' + fnName + ' rate=' + rate + ' units=' + units + ' hrs=' + hours);
         if (rate !== null) return { rate: rate, units: units, hours: hours };
+        inSection = false; // Total row found but no rate -- skip this section
       }
     }
+    console.log('[FCLM UMS] ' + fnName + ': section not found');
     return { rate: null, units: null, hours: null };
   }
 
