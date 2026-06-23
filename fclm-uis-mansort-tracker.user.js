@@ -169,7 +169,7 @@
       rates.uis5lb = {
         units: _u5 || null,
         hours: _h5 || null,
-        rate:  (_u5 && _h5) ? _u5 / _h5 : (_scp5.rate || _ind5.rate),
+        rate:  _scp5.rate || _ind5.rate,
       };
       var _scp = parseFunctionRow(html, 'UIS_20lb_SCP_Induct');
       var _ind = parseFunctionRow(html, 'UIS_20lb_Induct');
@@ -178,7 +178,7 @@
       rates.uis20lb = {
         units: _u20 || null,
         hours: _h20 || null,
-        rate:  (_u20 && _h20) ? _u20 / _h20 : (_scp.rate || _ind.rate),
+        rate:  _scp.rate || _ind.rate,
       };
       rates.manSort = parseFunctionRow(html, 'RC Sort Primary');
       // RC Sort total vol = sum of all 3 card units
