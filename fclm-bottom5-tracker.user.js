@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -77,63 +77,50 @@
   }
 
   // ── Parser ───────────────────────────────────────────────────────────────
-  // rateType 'uis'    → 5th numeric in row = EACH UPH
-  // rateType 'rcsort' → compute nums[2] / nums[1] (units / paid hours)
-  function parseBottom5(html, rateType) {
+  // Fixed cell layout (0-indexed, 21 cols when Total tab is active):
+  //   [0]=Type  [1]=ID  [2]=Name  [3]=Manager
+  //   [4-7]=Size Hrs (S/M/L/HB)  [8]=Total Hrs
+  //   [9]=Jobs  [10]=JPH  (for UIS, JPH = EACH-Total UPH; for RC Sort, JPH = sort rate)
+  //   [11-18]=EACH-S/M/L/HB UNIT+UPH pairs  [19]=EACH-Total UNIT  [20]=EACH-Total UPH
+  // Some size columns are blank per employee, making numeric-count indices unreliable.
+  // Use fixed cell index cells[10] = JPH for all functions.
+  function parseBottom5(html) {
     var doc = new DOMParser().parseFromString(html, 'text/html');
     var tables = doc.querySelectorAll('table');
     var best = [];
 
     for (var t = 0; t < tables.length; t++) {
       var rows = tables[t].querySelectorAll('tr');
-      var nameCol = -1;
       var results = [];
 
       for (var r = 0; r < rows.length; r++) {
-        var cells = rows[r].querySelectorAll('td, th');
-        if (!cells.length) continue;
+        var cells = rows[r].querySelectorAll('td');
+        if (cells.length < 11) continue;
 
-        // Find name column from header
-        if (nameCol === -1) {
-          for (var ci = 0; ci < cells.length; ci++) {
-            if (cells[ci].textContent.trim().toLowerCase() === 'name') { nameCol = ci; break; }
-          }
-          continue;
-        }
+        // Data rows: Type must be AMZN/TEMP/3PTY
+        var type = cells[0].textContent.trim();
+        if (!/^(AMZN|TEMP|3PTY)$/.test(type)) continue;
 
-        // Skip summary/sub-header rows
-        var first = cells[0].textContent.trim().toLowerCase();
-        if (['total','small','medium','large','heavybulky','paid hours','name','type'].indexOf(first) >= 0) continue;
-        if (nameCol >= cells.length) continue;
+        // Skip Anonymous — untracked items with no hours
+        var id = cells[1].textContent.trim();
+        if (id === '000000') continue;
 
-        var name = cells[nameCol].textContent.trim();
+        var name = cells[2].textContent.trim();
         if (!name) continue;
 
-        // Collect numerics from this row
-        var nums = [];
-        for (var ci = 0; ci < cells.length; ci++) {
-          var v = parseFloat(cells[ci].textContent.trim().replace(/,/g, ''));
-          if (!isNaN(v)) nums.push(v);
-        }
+        // JPH = cells[10], always in the same position regardless of blank size columns
+        var rate = parseFloat((cells[10].textContent || '').replace(/,/g, ''));
+        if (isNaN(rate) || rate <= 0) continue;
 
-        var rate = NaN;
-        if (rateType === 'uis' && nums.length >= 5) {
-          rate = nums[4]; // 5th numeric = EACH UPH
-        } else if (rateType === 'rcsort' && nums.length >= 3) {
-          rate = nums[1] > 0 ? nums[2] / nums[1] : NaN; // presortItems / paidHours
-        } else if (nums.length >= 5) {
-          rate = nums[4];
-        } else if (nums.length >= 2) {
-          rate = nums[nums.length - 2] > 0 ? nums[nums.length - 1] / nums[nums.length - 2] : NaN;
-        }
-
-        if (!isNaN(rate) && rate > 0) results.push({ name: name, rate: rate });
+        results.push({ name: name, rate: rate });
       }
 
       if (results.length > best.length) best = results;
     }
 
     best.sort(function (a, b) { return a.rate - b.rate; });
+    console.log('[FCLM B5] ' + best.length + ' employees parsed, bottom 5: ' +
+      best.slice(0, 5).map(function (r) { return r.name + '=' + r.rate.toFixed(1); }).join(', '));
     return best.slice(0, 5);
   }
 
@@ -177,7 +164,7 @@
     try {
       await Promise.all(FUNCTIONS.map(async function (fn) {
         var html = await httpGet(buildURL(fn.pid));
-        bottom5[fn.key] = parseBottom5(html, fn.rateType);
+        bottom5[fn.key] = parseBottom5(html);
       }));
       lastUpdated = new Date();
       renderAll();
