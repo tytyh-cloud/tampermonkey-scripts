@@ -1,8 +1,8 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      3.2
-// @description  Bottom 5 performers ΓÇö RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
+// @version      3.3
+// @description  Bottom 5 performers - RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
 // @grant        GM_xmlhttpRequest
@@ -36,7 +36,7 @@
 
   const ROW_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#60a5fa'];
 
-  // ΓöÇΓöÇ Persisted config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Persisted config -----------------------------------------------------
   let cfg = {
     startDate:   GM_getValue('b5_startDate',   '2026/06/21'),
     startHour:   GM_getValue('b5_startHour',   19),
@@ -58,7 +58,7 @@
   const pad2      = n => String(n).padStart(2, '0');
   const enc       = s => encodeURIComponent(s);
 
-  // ΓöÇΓöÇ URL builder ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- URL builder ----------------------------------------------------------
   // All three functions live on the same processId=1003009 page.
   function buildURL() {
     return 'https://fclm-portal.amazon.com/reports/functionRollup?' +
@@ -68,7 +68,7 @@
       INTRA_TAIL;
   }
 
-  // ΓöÇΓöÇ HTTP ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- HTTP -----------------------------------------------------------------
   function httpGet(url) {
     return new Promise((res, rej) => GM_xmlhttpRequest({
       method:  'GET',
@@ -78,11 +78,11 @@
     }));
   }
 
-  // ΓöÇΓöÇ Parser ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Parser ---------------------------------------------------------------
   // Page structure: one <table class="sortable result-table"> per function,
   // each identified by its <caption> (e.g. "RC Sort Primary [4300006775]").
   // Employee rows: cells[0] = AMZN/TEMP/3PTY, cells[2] = Name, cells[10] = JPH.
-  // fnName is matched as a substring of the caption ΓÇö works across site variants.
+  // fnName is matched as a substring of the caption - works across site variants.
 
   var _cachedDoc  = null;
   var _cachedHtml = null;
@@ -100,7 +100,7 @@
 
     // Find the employee detail table whose <caption> contains the function name.
     // Multiple tables may match (e.g. compact "Total" view + full breakdown).
-    // Pick the one whose first data row has the most cells — that's the full table.
+    // Pick the one whose first data row has the most cells - that's the full table.
     var tables = doc.querySelectorAll('table');
     var detail = null, bestCells = -1;
     for (var t = 0; t < tables.length; t++) {
@@ -153,7 +153,7 @@
     return results.slice(0, 5);
   }
 
-  // ΓöÇΓöÇ Render ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Render ---------------------------------------------------------------
   function renderSection(fn) {
     var el = document.getElementById('b5-sec-' + fn.key);
     if (!el) return;
@@ -183,11 +183,11 @@
     if (el) el.textContent = msg;
   }
 
-  // ΓöÇΓöÇ Fetch ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Fetch ----------------------------------------------------------------
   async function fetchAll() {
     if (fetching) return;
     fetching = true;
-    setStatus('Γƒ│ FetchingΓÇª');
+    setStatus('~| Fetching...');
     var btn = document.getElementById('b5-fetch');
     if (btn) btn.disabled = true;
     try {
@@ -199,7 +199,7 @@
       renderAll();
       setStatus('Updated ' + lastUpdated.toLocaleTimeString());
     } catch (e) {
-      setStatus('ΓÜá ' + e.message);
+      setStatus('!! ' + e.message);
       console.error('[FCLM B5]', e);
     } finally {
       fetching = false;
@@ -207,11 +207,11 @@
     }
   }
 
-  // ΓöÇΓöÇ Timer ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Timer ----------------------------------------------------------------
   function startTimer() { stopTimer(); if (cfg.autoRefresh) refreshTimer = setInterval(fetchAll, REFRESH_MS); }
   function stopTimer()  { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
 
-  // ΓöÇΓöÇ Apply settings ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Apply settings -------------------------------------------------------
   function applySettings() {
     cfg.wh        = document.getElementById('b5-wh').value.toUpperCase() || cfg.wh;
     cfg.startDate = fromInput(document.getElementById('b5-sdate').value) || cfg.startDate;
@@ -236,7 +236,7 @@
     cfg.autoRefresh ? startTimer() : stopTimer();
   }
 
-  // ΓöÇΓöÇ Style helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Style helpers --------------------------------------------------------
   var BASE  = 'box-sizing:border-box;font-family:system-ui,-apple-system,sans-serif;font-size:12px;';
   var S_INP = BASE + 'background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e2e8f0;outline:none;padding:4px 6px;width:100%;';
   var S_SM  = BASE + 'background:#161b22;border:1px solid #30363d;border-radius:4px;color:#e2e8f0;outline:none;padding:4px 2px;width:44px;text-align:center;';
@@ -244,7 +244,7 @@
     return BASE + 'background:' + bg + ';border:1px solid ' + bd + ';border-radius:4px;color:#e2e8f0;cursor:pointer;font-weight:600;';
   }
 
-  // ΓöÇΓöÇ Build panel ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Build panel ----------------------------------------------------------
   var panel = document.createElement('div');
   panel.id = 'b5-panel';
   panel.style.cssText = [
@@ -264,7 +264,7 @@
     '<div id="b5-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#161b22;border-radius:10px 10px 0 0;cursor:grab;border-bottom:1px solid #21262d;">',
       '<span style="font-weight:900;font-size:13px;color:#f1f5f9;letter-spacing:0.2px;">Bottom 5 Tracker</span>',
       '<div style="display:flex;gap:10px;align-items:center;">',
-        '<span id="b5-gear"    title="Settings" style="cursor:pointer;opacity:0.55;font-size:14px;line-height:1;">⚙</span>',
+        '<span id="b5-gear"    title="Settings" style="cursor:pointer;opacity:0.55;font-size:14px;line-height:1;">&#9881;</span>',
         '<span id="b5-min-btn" title="Minimize" style="cursor:pointer;opacity:0.55;font-size:18px;line-height:1;margin-top:-1px;">-</span>',
       '</div>',
     '</div>',
@@ -289,26 +289,26 @@
         '<span style="font-weight:900;color:#30363d;font-size:14px;">:</span>',
         '<input id="b5-emin"  type="number" min="0" max="59" value="' + pad2(cfg.endMin) + '" style="' + S_SM + '">',
       '</div>',
-      '<button id="b5-apply" style="' + S_BTN('#1f6feb','#388bfd') + 'padding:6px 0;width:100%;">Γ£ô Apply Changes</button>',
+      '<button id="b5-apply" style="' + S_BTN('#1f6feb','#388bfd') + 'padding:6px 0;width:100%;">>> Apply Changes</button>',
     '</div>',
 
     '<div id="b5-body">',
       sectionsHTML,
       '<div style="display:flex;align-items:center;gap:8px;padding:6px 14px 10px;">',
-        '<button id="b5-fetch" style="' + S_BTN('#1f6feb','#388bfd') + 'padding:5px 12px;">Γƒ│ Fetch Now</button>',
+        '<button id="b5-fetch" style="' + S_BTN('#1f6feb','#388bfd') + 'padding:5px 12px;">~| Fetch Now</button>',
         '<button id="b5-auto"  style="' + S_BTN(cfg.autoRefresh ? '#14532d' : '#374151', cfg.autoRefresh ? '#16a34a' : '#4b5563') + 'padding:5px 10px;">Auto: ' + (cfg.autoRefresh ? 'ON' : 'OFF') + '</button>',
         '<span id="b5-status" style="font-weight:900;font-size:11px;color:#484f58;flex:1;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Not fetched</span>',
       '</div>',
     '</div>',
   ].join('');
 
-  // ΓöÇΓöÇ Tab (minimized) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Tab (minimized) ------------------------------------------------------
   var tab = document.createElement('div');
   tab.id = 'b5-tab';
   tab.style.cssText = 'position:fixed;right:0;top:370px;width:28px;height:120px;background:#161b22;border:1px solid #21262d;border-right:none;border-radius:8px 0 0 8px;cursor:pointer;display:none;z-index:2147483647;align-items:center;justify-content:center;writing-mode:vertical-rl;font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;user-select:none;';
   tab.textContent = 'Bottom 5';
 
-  // ΓöÇΓöÇ Mount ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  // -- Mount ----------------------------------------------------------------
   function mount() {
     if (!document.body) { setTimeout(mount, 100); return; }
     document.body.appendChild(panel);
@@ -342,7 +342,7 @@
       panel.style.display = 'block';
     });
 
-    // ΓöÇΓöÇ Drag ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    // -- Drag --------------------------------------------------------------
     var hdr = document.getElementById('b5-hdr');
     var dragging = false, ox, oy, sx, sy;
 
