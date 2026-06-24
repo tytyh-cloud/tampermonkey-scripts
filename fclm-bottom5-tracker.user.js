@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      3.1
+// @version      3.2
 // @description  Bottom 5 performers ΓÇö RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -248,7 +248,7 @@
   var panel = document.createElement('div');
   panel.id = 'b5-panel';
   panel.style.cssText = [
-    'position:fixed', 'top:20px', 'left:20px', 'width:380px',
+    'position:fixed', 'top:20px', 'left:20px', 'width:400px',
     'background:#0d1117', 'border:1px solid #21262d', 'border-radius:10px',
     'box-shadow:0 8px 32px rgba(0,0,0,0.7)', 'color:#e2e8f0',
     'z-index:2147483647', 'font-family:system-ui,-apple-system,sans-serif',
