@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -115,6 +115,7 @@
     }
 
     var results = [];
+    var _dbgDone = false;
     var rows = detail.querySelectorAll('tr');
     for (var r = 0; r < rows.length; r++) {
       var cells = rows[r].querySelectorAll('td');
@@ -129,6 +130,16 @@
 
       var name = cells[2] ? cells[2].textContent.trim() : '';
       if (!name) continue;
+
+      // One-time: dump all cell values so we can identify the EACH UPH column index
+      if (!_dbgDone && fnName === 'RC Sort Primary') {
+        var dump = [];
+        for (var ci = 0; ci < cells.length; ci++) {
+          dump.push('[' + ci + ']=' + cells[ci].textContent.trim());
+        }
+        console.log('[FCLM B5] RC Sort row cells: ' + dump.join(' | '));
+        _dbgDone = true;
+      }
 
       // JPH is always cells[10] regardless of which size columns are blank
       var rate = parseFloat((cells[10].textContent || '').replace(/,/g, ''));
