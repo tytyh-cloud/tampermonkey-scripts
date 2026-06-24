@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -115,19 +115,24 @@
     }
 
     var results = [];
-    // RC Sort Primary: cells[20] = EACH total UPH (cells[10] is a subcategory rate, not the total)
-    // UIS functions: cells[10] = UPH
     var rateIdx = 20; // all three functions use cells[20] EACH-Total UPH
     var minCells = rateIdx + 1;
+    var _dbg = false;
     var rows = detail.querySelectorAll('tr');
     for (var r = 0; r < rows.length; r++) {
       var cells = rows[r].querySelectorAll('td');
+      // Debug: dump first row regardless of cell count to see structure
+      if (!_dbg && cells.length > 3) {
+        var dump = [];
+        for (var ci = 0; ci < cells.length; ci++) dump.push('['+ci+']='+cells[ci].textContent.trim());
+        console.log('[FCLM B5] ' + fnName + ' row cells: ' + dump.join(' | '));
+        _dbg = true;
+      }
       if (cells.length < minCells) continue;
 
       var type = cells[0].textContent.trim();
       if (!/^(AMZN|TEMP|3PTY)$/.test(type)) continue;
 
-      // Skip Anonymous (no hours, untracked items)
       var rawId = cells[1] ? cells[1].textContent.trim() : '';
       if (rawId === '000000') continue;
 
