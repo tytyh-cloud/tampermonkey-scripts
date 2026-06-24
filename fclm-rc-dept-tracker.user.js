@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.0
 // @description  UIS/ManSort rates + Bottom 5 performers - single panel for RC dept
-// @author       Tyler
+// @author       Tytyh
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-rc-dept-tracker.user.js
 // @downloadURL  https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-rc-dept-tracker.user.js
 // @match        *://fclm-portal.amazon.com/*
