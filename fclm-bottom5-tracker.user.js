@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -196,8 +196,16 @@
     try {
       var html = await httpGet(buildURL());
       console.log('[FCLM B5] fetch OK, html length=' + html.length);
-      // Log first 500 chars to confirm page content
-      console.log('[FCLM B5] page preview:', html.substring(0, 500).replace(/\s+/g, ' '));
+      // Search for key terms to see what names the page actually uses
+      var terms = ['RC Sort Primary', 'UIS_5lb', 'UIS_20lb', 'RC Sort', 'UIS 5', 'UIS 20', 'Sort Primary', 'Induct', 'AMZN', 'TEMP'];
+      terms.forEach(function(term) {
+        var idx = html.indexOf(term);
+        if (idx >= 0) {
+          console.log('[FCLM B5] FOUND "' + term + '" at ' + idx + ':', JSON.stringify(html.substring(idx, idx + 120)));
+        } else {
+          console.log('[FCLM B5] NOT FOUND: "' + term + '"');
+        }
+      });
       FUNCTIONS.forEach(function (fn) {
         bottom5[fn.key] = parseBottom5(html, fn.fnName);
       });
