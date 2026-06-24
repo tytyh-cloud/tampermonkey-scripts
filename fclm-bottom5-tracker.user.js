@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.9
 // @description  Bottom 5 performers ΓÇö RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -262,10 +262,10 @@
 
   panel.innerHTML = [
     '<div id="b5-hdr" style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#161b22;border-radius:10px 10px 0 0;cursor:grab;border-bottom:1px solid #21262d;">',
-      '<span style="font-weight:900;font-size:13px;color:#f1f5f9;letter-spacing:0.2px;">≡ƒôè Bottom 5 Tracker</span>',
+      '<span style="font-weight:900;font-size:13px;color:#f1f5f9;letter-spacing:0.2px;">Bottom 5 Tracker</span>',
       '<div style="display:flex;gap:10px;align-items:center;">',
-        '<span id="b5-gear"    title="Settings" style="cursor:pointer;opacity:0.55;font-size:14px;line-height:1;">ΓÜÖ∩╕Å</span>',
-        '<span id="b5-min-btn" title="Minimize" style="cursor:pointer;opacity:0.55;font-size:18px;line-height:1;margin-top:-1px;">ΓêÆ</span>',
+        '<span id="b5-gear"    title="Settings" style="cursor:pointer;opacity:0.55;font-size:14px;line-height:1;">⚙</span>',
+        '<span id="b5-min-btn" title="Minimize" style="cursor:pointer;opacity:0.55;font-size:18px;line-height:1;margin-top:-1px;">-</span>',
       '</div>',
     '</div>',
 
@@ -306,7 +306,7 @@
   var tab = document.createElement('div');
   tab.id = 'b5-tab';
   tab.style.cssText = 'position:fixed;left:0;top:100px;width:28px;height:120px;background:#161b22;border:1px solid #21262d;border-left:none;border-radius:0 8px 8px 0;cursor:pointer;display:none;z-index:2147483647;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;user-select:none;';
-  tab.textContent = '≡ƒôè Bottom 5';
+  tab.textContent = 'Bottom 5';
 
   // ΓöÇΓöÇ Mount ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   function mount() {
