@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -117,7 +117,7 @@
     var results = [];
     // RC Sort Primary: cells[20] = EACH total UPH (cells[10] is a subcategory rate, not the total)
     // UIS functions: cells[10] = UPH
-    var rateIdx = (fnName === 'RC Sort Primary' || fnName === 'UIS_5lb_SCP') ? 20 : 10;
+    var rateIdx = 20; // all three functions use cells[20] EACH-Total UPH
     var minCells = rateIdx + 1;
     var rows = detail.querySelectorAll('tr');
     for (var r = 0; r < rows.length; r++) {
