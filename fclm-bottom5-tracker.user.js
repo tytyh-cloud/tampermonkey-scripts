@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.3
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -81,8 +81,31 @@
   // ── Parser ───────────────────────────────────────────────────────────────
   // Page structure: one <table class="sortable result-table"> per function,
   // each identified by its <caption> (e.g. "RC Sort Primary [4300006775]").
-  // Employee rows: cells[0] = AMZN/TEMP/3PTY, cells[2] = Name, cells[10] = JPH.
-  // fnName is matched as a substring of the caption — works across site variants.
+  // Employee rows: cells[0] = AMZN/TEMP/3PTY, cells[2] = Name.
+  // EACH-Total UPH column is found dynamically from the table header.
+
+  // Walk the table header to find the column index of EACH-Total UPH.
+  // "EACH-Total" (or "Each-Total") th has colspan=2; UPH is the second sub-column (startPos+1).
+  function findEachTotalUPHIdx(table) {
+    var rows = table.querySelectorAll('tr');
+    for (var ri = 0; ri < rows.length; ri++) {
+      var ths = rows[ri].querySelectorAll('th');
+      if (ths.length < 4) continue; // skip thin rows
+      var pos = 0;
+      for (var ti = 0; ti < ths.length; ti++) {
+        var txt = ths[ti].textContent.trim().replace(/[\u2193\u2191\s]+/g, '');
+        var span = parseInt(ths[ti].getAttribute('colspan') || '1', 10);
+        // Match "EACH-Total", "Each-Total", "EachTotal", "EACH Total"
+        if (/each.?total/i.test(txt)) {
+          console.log('[FCLM B5] EACH-Total header found at col ' + pos + ' (span=' + span + ')');
+          return pos + (span > 1 ? 1 : 0); // UPH is second sub-col if colspan>1
+        }
+        pos += span;
+      }
+    }
+    console.log('[FCLM B5] EACH-Total header not found, falling back to col 20');
+    return 20;
+  }
 
   var _cachedDoc  = null;
   var _cachedHtml = null;
@@ -114,20 +137,14 @@
       return [];
     }
 
-    var results = [];
-    var rateIdx = 20; // all three functions use cells[20] EACH-Total UPH
+    // Dynamically find EACH-Total UPH column from header
+    var rateIdx  = findEachTotalUPHIdx(detail);
     var minCells = rateIdx + 1;
-    var _dbg = false;
+
+    var results = [];
     var rows = detail.querySelectorAll('tr');
     for (var r = 0; r < rows.length; r++) {
       var cells = rows[r].querySelectorAll('td');
-      // Debug: dump first row regardless of cell count to see structure
-      if (!_dbg && cells.length > 3) {
-        var dump = [];
-        for (var ci = 0; ci < cells.length; ci++) dump.push('['+ci+']='+cells[ci].textContent.trim());
-        console.log('[FCLM B5] ' + fnName + ' row cells: ' + dump.join(' | '));
-        _dbg = true;
-      }
       if (cells.length < minCells) continue;
 
       var type = cells[0].textContent.trim();
