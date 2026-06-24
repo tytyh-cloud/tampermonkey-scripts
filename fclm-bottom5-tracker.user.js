@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.3
+// @version      2.4
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -86,25 +86,28 @@
 
   // Walk the table header to find the column index of EACH-Total UPH.
   // "EACH-Total" (or "Each-Total") th has colspan=2; UPH is the second sub-column (startPos+1).
+  // Scan the table header to find the EACH-Total UPH column index.
+  // Strategy 1: find a <th> whose text matches "EACH-Total" (colspan=2 → UPH is pos+1).
+  // Strategy 2: fallback — find the last <th> whose text is "UPH" (works for
+  //   compact tables like UIS 5LB where the header just has UNIT | UPH at the end).
   function findEachTotalUPHIdx(table) {
     var rows = table.querySelectorAll('tr');
     for (var ri = 0; ri < rows.length; ri++) {
       var ths = rows[ri].querySelectorAll('th');
-      if (ths.length < 4) continue; // skip thin rows
-      var pos = 0;
+      if (ths.length < 4) continue;
+      var pos = 0, lastUPHPos = -1;
       for (var ti = 0; ti < ths.length; ti++) {
-        var txt = ths[ti].textContent.trim().replace(/[\u2193\u2191\s]+/g, '');
+        var txt = ths[ti].textContent.trim().replace(/[↓↑\s]+/g, '');
         var span = parseInt(ths[ti].getAttribute('colspan') || '1', 10);
-        // Match "EACH-Total", "Each-Total", "EachTotal", "EACH Total"
         if (/each.?total/i.test(txt)) {
-          console.log('[FCLM B5] EACH-Total header found at col ' + pos + ' (span=' + span + ')');
-          return pos + (span > 1 ? 1 : 0); // UPH is second sub-col if colspan>1
+          return pos + (span > 1 ? 1 : 0); // UPH is second sub-col
         }
+        if (/^UPH$/i.test(txt)) lastUPHPos = pos;
         pos += span;
       }
+      if (lastUPHPos >= 0) return lastUPHPos; // last UPH col = EACH-Total UPH
     }
-    console.log('[FCLM B5] EACH-Total header not found, falling back to col 20');
-    return 20;
+    return 20; // final fallback
   }
 
   var _cachedDoc  = null;
