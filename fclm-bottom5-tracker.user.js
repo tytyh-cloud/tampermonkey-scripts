@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      3.0
+// @version      3.1
 // @description  Bottom 5 performers ΓÇö RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -29,9 +29,9 @@
   // fnName matched against <caption> of the employee detail table (partial, site-agnostic).
   // RC Sort Primary caption is always exact; UIS captions vary by site suffix (_Induct, _ContPrep...).
   const FUNCTIONS = [
-    { label: 'RC Sort Primary', fnName: 'RC Sort Primary', key: 'rcsort', rateLabel: 'UPH' },
-    { label: 'UIS 20LB SCP',        fnName: 'UIS_20lb_SCP',    key: 'uis20',  rateLabel: 'UPH' },
     { label: 'UIS 5LB SCP',     fnName: 'UIS_5lb_SCP',     key: 'uis5',   rateLabel: 'UPH' },
+    { label: 'UIS 20LB SCP',    fnName: 'UIS_20lb_SCP',    key: 'uis20',  rateLabel: 'UPH' },
+    { label: 'RC Sort Primary', fnName: 'RC Sort Primary', key: 'rcsort', rateLabel: 'UPH' },
   ];
 
   const ROW_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#60a5fa'];
@@ -305,7 +305,7 @@
   // ΓöÇΓöÇ Tab (minimized) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   var tab = document.createElement('div');
   tab.id = 'b5-tab';
-  tab.style.cssText = 'position:fixed;left:0;top:100px;width:28px;height:120px;background:#161b22;border:1px solid #21262d;border-left:none;border-radius:0 8px 8px 0;cursor:pointer;display:none;z-index:2147483647;align-items:center;justify-content:center;writing-mode:vertical-rl;transform:rotate(180deg);font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;user-select:none;';
+  tab.style.cssText = 'position:fixed;right:0;top:370px;width:28px;height:120px;background:#161b22;border:1px solid #21262d;border-right:none;border-radius:8px 0 0 8px;cursor:pointer;display:none;z-index:2147483647;align-items:center;justify-content:center;writing-mode:vertical-rl;font-family:system-ui,-apple-system,sans-serif;font-size:11px;font-weight:900;color:#f1f5f9;letter-spacing:0.5px;user-select:none;';
   tab.textContent = 'Bottom 5';
 
   // ΓöÇΓöÇ Mount ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
