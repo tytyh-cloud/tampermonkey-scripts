@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM UIS / ManSort Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Floating overlay — UIS 5LB, UIS 20LB, ManSort rates from FCLM
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-uis-mansort-tracker.user.js
@@ -89,7 +89,7 @@
   }
 
   // ── Parser ─────────────────────────────────────────────────────────────────────────
-  // Parse HTML once and cache the doc -- avoids re-parsing 4x for one fetch.
+  // Parse HTML once and cache the doc.
   var _cachedDoc  = null;
   var _cachedHtml = null;
   function getDoc(html) {
@@ -100,44 +100,84 @@
     return _cachedDoc;
   }
 
-  // Find the Total row for a named function section on the rollup page.
-  // Column layout: [Size/Total] [Paid Hrs #1] [Jobs #2] [JPH #3] [Each Units #4] [Each UPH #5]
-  // Each UPH = 5th numeric (index 4), Each Units = 4th (index 3), Hrs = 1st (index 0).
-  // Uses ANY-cell Total detection (matches RPND tracker behaviour).
-  function parseFunctionRow(html, fnName) {
+  // Aggregate employee rows for a named function section.
+  // No summary Total row exists — must sum individual rows.
+  //
+  // Cell layout (0-indexed, fixed 21 cols on Total tab):
+  //   [0]=Type  [1]=ID  [2]=Name  [3]=Manager
+  //   [4-7]=Size Hrs (S/M/L/HB)  [8]=Total Hrs
+  //   [9]=Jobs  [10]=JPH
+  //   [11-18]=EACH-S/M/L/HB UNIT+UPH pairs
+  //   [19]=EACH-Total UNIT  [20]=EACH-Total UPH
+  //
+  // isSort=true  → rate = totalJobs / totalHrs  (JPH, for RC Sort)
+  // isSort=false → rate = totalUnits / totalHrs (UPH, for UIS)
+  // units always = EACH-Total UNIT (for volume card)
+  // Skips Anonymous rows (ID=000000).
+  function parseSection(html, fnName, isSort) {
     var doc    = getDoc(html);
     var needle = fnName.toLowerCase();
     var tables = doc.querySelectorAll('table');
+
     for (var t = 0; t < tables.length; t++) {
       if (tables[t].textContent.toLowerCase().indexOf(needle) < 0) continue;
       var rows = tables[t].querySelectorAll('tr');
       var inSection = false;
+      var totalHours = 0, totalUnits = 0, totalJobs = 0;
+      var hasData = false;
+
       for (var r = 0; r < rows.length; r++) {
         var cells = rows[r].querySelectorAll('td');
         if (!cells.length) continue;
         var rowText = rows[r].textContent.toLowerCase();
-        // Section header: row contains the function name AND no 'total' text.
-        // Reset inSection on new header to prevent cross-section bleed.
-        if (rowText.indexOf(needle) >= 0 && rowText.indexOf('total') < 0) {
+        var type    = cells[0] ? cells[0].textContent.trim() : '';
+
+        // Section header: row contains our function name.
+        if (rowText.indexOf(needle) >= 0) {
+          if (inSection && hasData) break; // already processed this section
           inSection = true;
           continue;
         }
         if (!inSection) continue;
-        // Check any cell for exact 'Total' text (matches RPND tracker approach).
-        var hasTotal = false;
-        for (var c = 0; c < cells.length; c++) {
-          if (cells[c].textContent.trim() === 'Total') { hasTotal = true; break; }
+
+        // New section started (another function’s header has bracket ID, not a data row).
+        var isDataRow = /^(AMZN|TEMP|3PTY)$/.test(type);
+        if (!isDataRow && rowText.indexOf('[') >= 0) {
+          if (hasData) break;
+          continue;
         }
-        if (!hasTotal) continue;
-        var rate  = nthNum(rows[r], 4); // 5th numeric = Each UPH
-        var units = nthNum(rows[r], 3); // 4th numeric = Each Units
-        var hours = nthNum(rows[r], 0); // 1st numeric = Total Paid Hrs
-        console.log('[FCLM UMS] ' + fnName + ' rate=' + rate + ' units=' + units + ' hrs=' + hours);
-        if (rate !== null) return { rate: rate, units: units, hours: hours };
-        inSection = false; // Total row found but no rate -- skip this section
+
+        // Skip column headers and any other non-data rows.
+        if (!isDataRow) continue;
+
+        // Skip Anonymous — untracked items with no hours.
+        var id = cells[1] ? cells[1].textContent.trim() : '';
+        if (id === '000000') continue;
+
+        // Need at least 20 cells for a full data row.
+        if (cells.length < 20) continue;
+
+        var hrs   = parseFloat((cells[8].textContent  || '').replace(/,/g, ''));
+        var units = parseFloat((cells[19].textContent || '').replace(/,/g, ''));
+        var jobs  = parseFloat((cells[9].textContent  || '').replace(/,/g, ''));
+
+        if (!isNaN(hrs) && hrs > 0) {
+          totalHours += hrs;
+          if (!isNaN(units) && units > 0) totalUnits += units;
+          if (!isNaN(jobs)  && jobs  > 0) totalJobs  += jobs;
+          hasData = true;
+        }
+      }
+
+      if (hasData && totalHours > 0) {
+        var rate = isSort ? (totalJobs / totalHours) : (totalUnits / totalHours);
+        console.log('[FCLM UMS] ' + fnName + ' rate=' + rate.toFixed(1) +
+          ' units=' + totalUnits + ' jobs=' + totalJobs + ' hrs=' + totalHours.toFixed(2));
+        return { rate: rate, units: totalUnits, hours: totalHours };
       }
     }
-    console.log('[FCLM UMS] ' + fnName + ': section not found');
+
+    console.log('[FCLM UMS] ' + fnName + ': no data found');
     return { rate: null, units: null, hours: null };
   }
 
@@ -212,26 +252,29 @@
     if (btn) btn.disabled = true;
     try {
       var html = await httpGet(buildURL());
-      var _scp5 = parseFunctionRow(html, 'UIS_5lb_SCP_Induct');
-      var _ind5 = parseFunctionRow(html, 'UIS_5lb_Induct');
-      var _u5 = (_scp5.units || 0) + (_ind5.units || 0);
-      var _h5 = (_scp5.hours || 0) + (_ind5.hours || 0);
+
+      // UIS 5LB: SCP-only rate; units = SCP + non-SCP combined
+      var _scp5 = parseSection(html, 'UIS_5lb_SCP_Induct', false);
+      var _ind5 = parseSection(html, 'UIS_5lb_Induct',     false);
       rates.uis5lb = {
-        units: _u5 || null,
-        hours: _h5 || null,
-        rate:  _scp5.rate || _ind5.rate,
+        rate:  _scp5.rate,
+        units: (_scp5.units || 0) + (_ind5.units || 0) || null,
+        hours: (_scp5.hours || 0) + (_ind5.hours || 0) || null,
       };
-      var _scp = parseFunctionRow(html, 'UIS_20lb_SCP_Induct');
-      var _ind = parseFunctionRow(html, 'UIS_20lb_Induct');
-      var _u20 = (_scp.units || 0) + (_ind.units || 0);
-      var _h20 = (_scp.hours || 0) + (_ind.hours || 0);
+
+      // UIS 20LB: SCP-only rate; units = SCP + non-SCP combined
+      var _scp20 = parseSection(html, 'UIS_20lb_SCP_Induct', false);
+      var _ind20 = parseSection(html, 'UIS_20lb_Induct',     false);
       rates.uis20lb = {
-        units: _u20 || null,
-        hours: _h20 || null,
-        rate:  _scp.rate || _ind.rate,
+        rate:  _scp20.rate,
+        units: (_scp20.units || 0) + (_ind20.units || 0) || null,
+        hours: (_scp20.hours || 0) + (_ind20.hours || 0) || null,
       };
-      rates.manSort = parseFunctionRow(html, 'RC Sort Primary');
-      // RC Sort total vol = sum of all 3 card units
+
+      // ManSort: JPH rate from RC Sort Primary
+      rates.manSort = parseSection(html, 'RC Sort Primary', true);
+
+      // Total vol = sum of EACH-Total units across all three functions
       var _v = (rates.uis5lb.units || 0) + (rates.uis20lb.units || 0) + (rates.manSort.units || 0);
       rcSortVol = _v || null;
       lastUpdated = new Date();
