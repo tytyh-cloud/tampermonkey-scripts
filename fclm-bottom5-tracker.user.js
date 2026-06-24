@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -26,11 +26,12 @@
     '&startHourIntraday3=0&startMinuteIntraday3=0' +
     '&startHourIntraday4=0&startMinuteIntraday4=0';
 
-  // fnName must match the section header text on the processId=1003009 page
+  // fnName matched against <caption> of the employee detail table (partial, site-agnostic).
+  // RC Sort Primary caption is always exact; UIS captions vary by site suffix (_Induct, _ContPrep...).
   const FUNCTIONS = [
-    { label: 'RC Sort Primary', fnName: 'RC Sort Primary',      key: 'rcsort', rateLabel: 'JPH' },
-    { label: 'UIS 20LB SCP',    fnName: 'UIS_20lb_SCP_Induct', key: 'uis20',  rateLabel: 'UPH' },
-    { label: 'UIS 5LB SCP',     fnName: 'UIS_5lb_SCP_Induct',  key: 'uis5',   rateLabel: 'UPH' },
+    { label: 'RC Sort Primary', fnName: 'RC Sort Primary', key: 'rcsort', rateLabel: 'JPH' },
+    { label: 'UIS 20LB',        fnName: 'UIS_20lb',        key: 'uis20',  rateLabel: 'UPH' },
+    { label: 'UIS 5LB SCP',     fnName: 'UIS_5lb_SCP',     key: 'uis5',   rateLabel: 'UPH' },
   ];
 
   const ROW_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#94a3b8'];
@@ -78,14 +79,11 @@
   }
 
   // ── Parser ───────────────────────────────────────────────────────────────
-  // All functions are sections on one page (processId=1003009).
-  // Parse once and cache; find each function's section by name.
-  //
-  // Cell layout (0-indexed, fixed 21 cols on Total tab):
-  //   [0]=Type  [1]=ID  [2]=Name  [3]=Manager
-  //   [4-7]=Size Hrs (S/M/L/HB)  [8]=Total Hrs  [9]=Jobs  [10]=JPH
-  //   [11-20]=EACH size UNIT+UPH pairs
-  // cells[10]=JPH is consistent for all functions regardless of blank size columns.
+  // Page structure: one <table class="sortable result-table"> per function,
+  // each identified by its <caption> (e.g. "RC Sort Primary [4300006775]").
+  // Employee rows: cells[0] = AMZN/TEMP/3PTY, cells[2] = Name, cells[10] = JPH.
+  // fnName is matched as a substring of the caption — works across site variants.
+
   var _cachedDoc  = null;
   var _cachedHtml = null;
   function getDoc(html) {
@@ -99,61 +97,50 @@
   function parseBottom5(html, fnName) {
     var doc    = getDoc(html);
     var needle = fnName.toLowerCase();
+
+    // Find the employee detail table whose <caption> contains the function name
     var tables = doc.querySelectorAll('table');
-
+    var detail = null;
     for (var t = 0; t < tables.length; t++) {
-      if (tables[t].textContent.toLowerCase().indexOf(needle) < 0) continue;
-      var rows = tables[t].querySelectorAll('tr');
-      var inSection = false;
-      var results = [];
-
-      for (var r = 0; r < rows.length; r++) {
-        var cells = rows[r].querySelectorAll('td');
-        if (!cells.length) continue;
-        var rowText = rows[r].textContent.toLowerCase();
-        var type    = cells[0] ? cells[0].textContent.trim() : '';
-
-        // Section header: contains function name
-        if (rowText.indexOf(needle) >= 0) {
-          if (inSection && results.length) break;
-          inSection = true;
-          continue;
-        }
-        if (!inSection) continue;
-
-        // New section started (bracket ID present, not a data row)
-        var isDataRow = /^(AMZN|TEMP|3PTY)$/.test(type);
-        if (!isDataRow && rowText.indexOf('[') >= 0) {
-          if (results.length) break;
-          continue;
-        }
-        if (!isDataRow) continue;
-
-        // Skip Anonymous
-        var id = cells[1] ? cells[1].textContent.trim() : '';
-        if (id === '000000') continue;
-
-        if (cells.length < 11) continue;
-
-        var name = cells[2].textContent.trim();
-        if (!name) continue;
-
-        var rate = parseFloat((cells[10].textContent || '').replace(/,/g, ''));
-        if (isNaN(rate) || rate <= 0) continue;
-
-        results.push({ name: name, rate: rate });
-      }
-
-      if (results.length) {
-        results.sort(function (a, b) { return a.rate - b.rate; });
-        console.log('[FCLM B5] ' + fnName + ': ' + results.length + ' employees, bottom 5: ' +
-          results.slice(0, 5).map(function (r) { return r.name + '=' + r.rate.toFixed(1); }).join(', '));
-        return results.slice(0, 5);
+      var cap = tables[t].querySelector('caption');
+      if (cap && cap.textContent.toLowerCase().indexOf(needle) >= 0) {
+        detail = tables[t];
+        break;
       }
     }
 
-    console.log('[FCLM B5] ' + fnName + ': no data found');
-    return [];
+    if (!detail) {
+      console.log('[FCLM B5] ' + fnName + ': detail table not found');
+      return [];
+    }
+
+    var results = [];
+    var rows = detail.querySelectorAll('tr');
+    for (var r = 0; r < rows.length; r++) {
+      var cells = rows[r].querySelectorAll('td');
+      if (cells.length < 11) continue;
+
+      var type = cells[0].textContent.trim();
+      if (!/^(AMZN|TEMP|3PTY)$/.test(type)) continue;
+
+      // Skip Anonymous (no hours, untracked items)
+      var rawId = cells[1] ? cells[1].textContent.trim() : '';
+      if (rawId === '000000') continue;
+
+      var name = cells[2] ? cells[2].textContent.trim() : '';
+      if (!name) continue;
+
+      // JPH is always cells[10] regardless of which size columns are blank
+      var rate = parseFloat((cells[10].textContent || '').replace(/,/g, ''));
+      if (isNaN(rate) || rate <= 0) continue;
+
+      results.push({ name: name, rate: rate });
+    }
+
+    results.sort(function (a, b) { return a.rate - b.rate; });
+    console.log('[FCLM B5] ' + fnName + ': ' + results.length + ' employees, bottom 5: ' +
+      results.slice(0, 5).map(function (r) { return r.name + '=' + r.rate.toFixed(1); }).join(', '));
+    return results.slice(0, 5);
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -195,24 +182,6 @@
     if (btn) btn.disabled = true;
     try {
       var html = await httpGet(buildURL());
-      console.log('[FCLM B5] fetch OK, html length=' + html.length);
-      // Log all occurrences of RC Sort Primary + 800 chars before first AMZN row
-      var allIdxs = [];
-      var searchFrom = 0;
-      while (true) {
-        var fi = html.indexOf('RC Sort Primary', searchFrom);
-        if (fi < 0) break;
-        allIdxs.push(fi);
-        searchFrom = fi + 1;
-      }
-      console.log('[FCLM B5] RC Sort Primary occurrences: ' + allIdxs.length + ' at ' + allIdxs.join(', '));
-      allIdxs.forEach(function(i) {
-        console.log('[FCLM B5] occurrence at ' + i + ':', JSON.stringify(html.substring(i - 100, i + 200)));
-      });
-      var amznAt = html.indexOf('AMZN</td>');
-      if (amznAt >= 0) {
-        console.log('[FCLM B5] 800 chars before first AMZN row:', JSON.stringify(html.substring(Math.max(0, amznAt - 800), amznAt + 100)));
-      }
       FUNCTIONS.forEach(function (fn) {
         bottom5[fn.key] = parseBottom5(html, fn.fnName);
       });
