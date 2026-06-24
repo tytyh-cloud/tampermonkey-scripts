@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -196,16 +196,15 @@
     try {
       var html = await httpGet(buildURL());
       console.log('[FCLM B5] fetch OK, html length=' + html.length);
-      // Search for key terms to see what names the page actually uses
-      var terms = ['RC Sort Primary', 'UIS_5lb', 'UIS_20lb', 'RC Sort', 'UIS 5', 'UIS 20', 'Sort Primary', 'Induct', 'AMZN', 'TEMP'];
-      terms.forEach(function(term) {
-        var idx = html.indexOf(term);
-        if (idx >= 0) {
-          console.log('[FCLM B5] FOUND "' + term + '" at ' + idx + ':', JSON.stringify(html.substring(idx, idx + 120)));
-        } else {
-          console.log('[FCLM B5] NOT FOUND: "' + term + '"');
-        }
-      });
+      // Log 600 chars of context before and including the first AMZN row
+      var amznIdx = html.indexOf('<td>\nAMZN');
+      if (amznIdx < 0) amznIdx = html.indexOf('>AMZN<');
+      if (amznIdx >= 0) {
+        console.log('[FCLM B5] Context before AMZN row (600 chars back):',
+          JSON.stringify(html.substring(Math.max(0, amznIdx - 600), amznIdx + 200)));
+      } else {
+        console.log('[FCLM B5] AMZN row pattern not found');
+      }
       FUNCTIONS.forEach(function (fn) {
         bottom5[fn.key] = parseBottom5(html, fn.fnName);
       });
