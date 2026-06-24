@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.9
+// @version      3.0
 // @description  Bottom 5 performers ΓÇö RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -30,11 +30,11 @@
   // RC Sort Primary caption is always exact; UIS captions vary by site suffix (_Induct, _ContPrep...).
   const FUNCTIONS = [
     { label: 'RC Sort Primary', fnName: 'RC Sort Primary', key: 'rcsort', rateLabel: 'UPH' },
-    { label: 'UIS 20LB',        fnName: 'UIS_20lb_SCP',    key: 'uis20',  rateLabel: 'UPH' },
+    { label: 'UIS 20LB SCP',        fnName: 'UIS_20lb_SCP',    key: 'uis20',  rateLabel: 'UPH' },
     { label: 'UIS 5LB SCP',     fnName: 'UIS_5lb_SCP',     key: 'uis5',   rateLabel: 'UPH' },
   ];
 
-  const ROW_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#94a3b8'];
+  const ROW_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#60a5fa'];
 
   // ΓöÇΓöÇ Persisted config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   let cfg = {
