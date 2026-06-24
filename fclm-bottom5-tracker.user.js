@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.5
 // @description  Bottom 5 performers ΓÇö RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -98,15 +98,17 @@
     var doc    = getDoc(html);
     var needle = fnName.toLowerCase();
 
-    // Find the employee detail table whose <caption> contains the function name
+    // Find the employee detail table whose <caption> contains the function name.
+    // Multiple tables may match (e.g. compact "Total" view + full breakdown).
+    // Pick the one whose first data row has the most cells — that's the full table.
     var tables = doc.querySelectorAll('table');
-    var detail = null;
+    var detail = null, bestCells = -1;
     for (var t = 0; t < tables.length; t++) {
       var cap = tables[t].querySelector('caption');
-      if (cap && cap.textContent.toLowerCase().indexOf(needle) >= 0) {
-        detail = tables[t];
-        break;
-      }
+      if (!cap || cap.textContent.toLowerCase().indexOf(needle) < 0) continue;
+      var firstRow = tables[t].querySelector('tr td');
+      var rowCells = firstRow ? firstRow.parentNode.querySelectorAll('td').length : 0;
+      if (rowCells > bestCells) { bestCells = rowCells; detail = tables[t]; }
     }
 
     if (!detail) {
