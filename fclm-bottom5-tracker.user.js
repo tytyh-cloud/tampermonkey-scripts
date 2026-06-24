@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -26,10 +26,11 @@
     '&startHourIntraday3=0&startMinuteIntraday3=0' +
     '&startHourIntraday4=0&startMinuteIntraday4=0';
 
+  // fnName must match the section header text on the processId=1003009 page
   const FUNCTIONS = [
-    { label: 'RC Sort Primary', pid: '4300006775',    key: 'rcsort', rateType: 'rcsort', rateLabel: 'JPH' },
-    { label: 'UIS 20LB SCP',    pid: '1748942479650', key: 'uis20',  rateType: 'uis',    rateLabel: 'UPH' },
-    { label: 'UIS 5LB SCP',     pid: '1748942467646', key: 'uis5',   rateType: 'uis',    rateLabel: 'UPH' },
+    { label: 'RC Sort Primary', fnName: 'RC Sort Primary',      key: 'rcsort', rateLabel: 'JPH' },
+    { label: 'UIS 20LB SCP',    fnName: 'UIS_20lb_SCP_Induct', key: 'uis20',  rateLabel: 'UPH' },
+    { label: 'UIS 5LB SCP',     fnName: 'UIS_5lb_SCP_Induct',  key: 'uis5',   rateLabel: 'UPH' },
   ];
 
   const ROW_COLORS = ['#f87171', '#fb923c', '#fbbf24', '#a3e635', '#94a3b8'];
@@ -57,10 +58,10 @@
   const enc       = s => encodeURIComponent(s);
 
   // ── URL builder ──────────────────────────────────────────────────────────
-  function buildURL(pid) {
+  // All three functions live on the same processId=1003009 page.
+  function buildURL() {
     return 'https://fclm-portal.amazon.com/reports/functionRollup?' +
-      'reportFormat=HTML&warehouseId=' + cfg.wh + '&processId=' + pid +
-      '&maxIntradayDays=1&spanType=Intraday' +
+      'reportFormat=HTML&warehouseId=' + cfg.wh + '&processId=1003009&maxIntradayDays=1&spanType=Intraday' +
       '&startDateIntraday=' + enc(cfg.startDate) + '&startHourIntraday=' + cfg.startHour + '&startMinuteIntraday=' + cfg.startMin +
       '&endDateIntraday='   + enc(cfg.endDate)   + '&endHourIntraday='   + cfg.endHour  + '&endMinuteIntraday='   + cfg.endMin +
       INTRA_TAIL;
@@ -77,51 +78,82 @@
   }
 
   // ── Parser ───────────────────────────────────────────────────────────────
-  // Fixed cell layout (0-indexed, 21 cols when Total tab is active):
+  // All functions are sections on one page (processId=1003009).
+  // Parse once and cache; find each function's section by name.
+  //
+  // Cell layout (0-indexed, fixed 21 cols on Total tab):
   //   [0]=Type  [1]=ID  [2]=Name  [3]=Manager
-  //   [4-7]=Size Hrs (S/M/L/HB)  [8]=Total Hrs
-  //   [9]=Jobs  [10]=JPH  (for UIS, JPH = EACH-Total UPH; for RC Sort, JPH = sort rate)
-  //   [11-18]=EACH-S/M/L/HB UNIT+UPH pairs  [19]=EACH-Total UNIT  [20]=EACH-Total UPH
-  // Some size columns are blank per employee, making numeric-count indices unreliable.
-  // Use fixed cell index cells[10] = JPH for all functions.
-  function parseBottom5(html) {
-    var doc = new DOMParser().parseFromString(html, 'text/html');
+  //   [4-7]=Size Hrs (S/M/L/HB)  [8]=Total Hrs  [9]=Jobs  [10]=JPH
+  //   [11-20]=EACH size UNIT+UPH pairs
+  // cells[10]=JPH is consistent for all functions regardless of blank size columns.
+  var _cachedDoc  = null;
+  var _cachedHtml = null;
+  function getDoc(html) {
+    if (html !== _cachedHtml) {
+      _cachedDoc  = new DOMParser().parseFromString(html, 'text/html');
+      _cachedHtml = html;
+    }
+    return _cachedDoc;
+  }
+
+  function parseBottom5(html, fnName) {
+    var doc    = getDoc(html);
+    var needle = fnName.toLowerCase();
     var tables = doc.querySelectorAll('table');
-    var best = [];
 
     for (var t = 0; t < tables.length; t++) {
+      if (tables[t].textContent.toLowerCase().indexOf(needle) < 0) continue;
       var rows = tables[t].querySelectorAll('tr');
+      var inSection = false;
       var results = [];
 
       for (var r = 0; r < rows.length; r++) {
         var cells = rows[r].querySelectorAll('td');
-        if (cells.length < 11) continue;
+        if (!cells.length) continue;
+        var rowText = rows[r].textContent.toLowerCase();
+        var type    = cells[0] ? cells[0].textContent.trim() : '';
 
-        // Data rows: Type must be AMZN/TEMP/3PTY
-        var type = cells[0].textContent.trim();
-        if (!/^(AMZN|TEMP|3PTY)$/.test(type)) continue;
+        // Section header: contains function name
+        if (rowText.indexOf(needle) >= 0) {
+          if (inSection && results.length) break;
+          inSection = true;
+          continue;
+        }
+        if (!inSection) continue;
 
-        // Skip Anonymous — untracked items with no hours
-        var id = cells[1].textContent.trim();
+        // New section started (bracket ID present, not a data row)
+        var isDataRow = /^(AMZN|TEMP|3PTY)$/.test(type);
+        if (!isDataRow && rowText.indexOf('[') >= 0) {
+          if (results.length) break;
+          continue;
+        }
+        if (!isDataRow) continue;
+
+        // Skip Anonymous
+        var id = cells[1] ? cells[1].textContent.trim() : '';
         if (id === '000000') continue;
+
+        if (cells.length < 11) continue;
 
         var name = cells[2].textContent.trim();
         if (!name) continue;
 
-        // JPH = cells[10], always in the same position regardless of blank size columns
         var rate = parseFloat((cells[10].textContent || '').replace(/,/g, ''));
         if (isNaN(rate) || rate <= 0) continue;
 
         results.push({ name: name, rate: rate });
       }
 
-      if (results.length > best.length) best = results;
+      if (results.length) {
+        results.sort(function (a, b) { return a.rate - b.rate; });
+        console.log('[FCLM B5] ' + fnName + ': ' + results.length + ' employees, bottom 5: ' +
+          results.slice(0, 5).map(function (r) { return r.name + '=' + r.rate.toFixed(1); }).join(', '));
+        return results.slice(0, 5);
+      }
     }
 
-    best.sort(function (a, b) { return a.rate - b.rate; });
-    console.log('[FCLM B5] ' + best.length + ' employees parsed, bottom 5: ' +
-      best.slice(0, 5).map(function (r) { return r.name + '=' + r.rate.toFixed(1); }).join(', '));
-    return best.slice(0, 5);
+    console.log('[FCLM B5] ' + fnName + ': no data found');
+    return [];
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -162,10 +194,10 @@
     var btn = document.getElementById('b5-fetch');
     if (btn) btn.disabled = true;
     try {
-      await Promise.all(FUNCTIONS.map(async function (fn) {
-        var html = await httpGet(buildURL(fn.pid));
-        bottom5[fn.key] = parseBottom5(html);
-      }));
+      var html = await httpGet(buildURL());
+      FUNCTIONS.forEach(function (fn) {
+        bottom5[fn.key] = parseBottom5(html, fn.fnName);
+      });
       lastUpdated = new Date();
       renderAll();
       setStatus('Updated ' + lastUpdated.toLocaleTimeString());
