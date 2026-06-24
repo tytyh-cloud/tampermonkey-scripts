@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.8
+// @version      1.9
 // @description  Bottom 5 performers — RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -29,7 +29,7 @@
   // fnName matched against <caption> of the employee detail table (partial, site-agnostic).
   // RC Sort Primary caption is always exact; UIS captions vary by site suffix (_Induct, _ContPrep...).
   const FUNCTIONS = [
-    { label: 'RC Sort Primary', fnName: 'RC Sort Primary', key: 'rcsort', rateLabel: 'JPH' },
+    { label: 'RC Sort Primary', fnName: 'RC Sort Primary', key: 'rcsort', rateLabel: 'UPH' },
     { label: 'UIS 20LB',        fnName: 'UIS_20lb',        key: 'uis20',  rateLabel: 'UPH' },
     { label: 'UIS 5LB SCP',     fnName: 'UIS_5lb_SCP',     key: 'uis5',   rateLabel: 'UPH' },
   ];
@@ -115,11 +115,14 @@
     }
 
     var results = [];
-    var _dbgDone = false;
+    // RC Sort Primary: cells[20] = EACH total UPH (cells[10] is a subcategory rate, not the total)
+    // UIS functions: cells[10] = UPH
+    var rateIdx = (fnName === 'RC Sort Primary') ? 20 : 10;
+    var minCells = rateIdx + 1;
     var rows = detail.querySelectorAll('tr');
     for (var r = 0; r < rows.length; r++) {
       var cells = rows[r].querySelectorAll('td');
-      if (cells.length < 11) continue;
+      if (cells.length < minCells) continue;
 
       var type = cells[0].textContent.trim();
       if (!/^(AMZN|TEMP|3PTY)$/.test(type)) continue;
@@ -131,18 +134,7 @@
       var name = cells[2] ? cells[2].textContent.trim() : '';
       if (!name) continue;
 
-      // One-time: dump all cell values so we can identify the EACH UPH column index
-      if (!_dbgDone && fnName === 'RC Sort Primary') {
-        var dump = [];
-        for (var ci = 0; ci < cells.length; ci++) {
-          dump.push('[' + ci + ']=' + cells[ci].textContent.trim());
-        }
-        console.log('[FCLM B5] RC Sort row cells: ' + dump.join(' | '));
-        _dbgDone = true;
-      }
-
-      // JPH is always cells[10] regardless of which size columns are blank
-      var rate = parseFloat((cells[10].textContent || '').replace(/,/g, ''));
+      var rate = parseFloat((cells[rateIdx].textContent || '').replace(/,/g, ''));
       if (isNaN(rate) || rate <= 0) continue;
 
       results.push({ name: name, rate: rate });
