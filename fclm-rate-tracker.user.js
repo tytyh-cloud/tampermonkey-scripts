@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RPND Rate Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Floating overlay — Decant, Decant Non-TI, Prep, Each Receive rates from FCLM
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-rate-tracker.user.js
@@ -13,6 +13,7 @@
 // @connect      fclm-portal.amazon.com
 // @exclude      *://fclm-portal.amazon.com/employee/timeDetails*
 // @exclude      *://fclm-portal.amazon.com/reports/ppaTimeOnTask*
+// @exclude      *://fclm-portal.amazon.com/reports/timeOnTask*
 // @exclude      *://fclm-portal.amazon.com/employee/ppaTimeDetails*
 // ==/UserScript==
 

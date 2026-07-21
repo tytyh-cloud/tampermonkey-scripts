@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM UIS / ManSort Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Floating overlay — UIS 5LB, UIS 20LB, ManSort rates from FCLM
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-uis-mansort-tracker.user.js
@@ -13,6 +13,7 @@
 // @connect      fclm-portal.amazon.com
 // @exclude      *://fclm-portal.amazon.com/employee/timeDetails*
 // @exclude      *://fclm-portal.amazon.com/reports/ppaTimeOnTask*
+// @exclude      *://fclm-portal.amazon.com/reports/timeOnTask*
 // @exclude      *://fclm-portal.amazon.com/employee/ppaTimeDetails*
 // ==/UserScript==
 

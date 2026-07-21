@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM RC Dept Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  UIS/ManSort rates + Bottom 5 performers - single panel for RC dept
 // @author       Tytyh
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-rc-dept-tracker.user.js
@@ -13,6 +13,7 @@
 // @connect      fclm-portal.amazon.com
 // @exclude      *://fclm-portal.amazon.com/employee/timeDetails*
 // @exclude      *://fclm-portal.amazon.com/reports/ppaTimeOnTask*
+// @exclude      *://fclm-portal.amazon.com/reports/timeOnTask*
 // @exclude      *://fclm-portal.amazon.com/employee/ppaTimeDetails*
 // ==/UserScript==
 

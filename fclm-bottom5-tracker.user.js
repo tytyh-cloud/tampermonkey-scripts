@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM Bottom 5 Tracker
 // @namespace    http://tampermonkey.net/
-// @version      3.3
+// @version      3.4
 // @description  Bottom 5 performers - RC Sort Primary, UIS 20LB SCP, UIS 5LB SCP
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -13,6 +13,7 @@
 // @downloadURL  https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-bottom5-tracker.user.js
 // @exclude      *://fclm-portal.amazon.com/employee/timeDetails*
 // @exclude      *://fclm-portal.amazon.com/reports/ppaTimeOnTask*
+// @exclude      *://fclm-portal.amazon.com/reports/timeOnTask*
 // @exclude      *://fclm-portal.amazon.com/employee/ppaTimeDetails*
 // ==/UserScript==
 
