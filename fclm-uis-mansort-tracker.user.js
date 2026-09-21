@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         FCLM UIS / ManSort Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Floating overlay — UIS 5LB, UIS 20LB, ManSort rates from FCLM
+// @version      1.3
+// @description  Floating overlay — UIS 5LB, UIS 20LB, ManSort, RC Sort (IMO1 processPathRollup)
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-uis-mansort-tracker.user.js
 // @downloadURL  https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-uis-mansort-tracker.user.js
@@ -22,11 +22,6 @@
 
   const WH = () => cfg.wh;
   const REFRESH_MS = 60000;
-  const INTRA_TAIL =
-    '&startHourIntraday1=0&startMinuteIntraday1=0' +
-    '&startHourIntraday2=0&startMinuteIntraday2=0' +
-    '&startHourIntraday3=0&startMinuteIntraday3=0' +
-    '&startHourIntraday4=0&startMinuteIntraday4=0';
 
   // ── Persisted config ─────────────────────────────────────────────────────
   let cfg = {
@@ -41,7 +36,7 @@
     tManSort:    GM_getValue('ums_tManSort',    ''),
     tVol:        GM_getValue('ums_tVol',        ''),
     autoRefresh: GM_getValue('ums_autoRefresh', true),
-    wh:          GM_getValue('ums_wh', ''),
+    wh:          GM_getValue('ums_wh', 'IMO1'),
   };
 
   let rates = {
@@ -61,11 +56,12 @@
 
   // ── URL builder ──────────────────────────────────────────────────────────
   function buildURL() {
-    return 'https://fclm-portal.amazon.com/reports/functionRollup?' +
-      'reportFormat=HTML&warehouseId=' + WH() + '&processId=1003009&maxIntradayDays=1&spanType=Intraday' +
+    return 'https://fclm-portal.amazon.com/reports/processPathRollup?' +
+      'reportFormat=HTML&warehouseId=' + WH() +
+      '&startDateDay=' + enc(cfg.endDate) + '&maxIntradayDays=1&spanType=Intraday' +
       '&startDateIntraday=' + enc(cfg.startDate) + '&startHourIntraday=' + cfg.startHour + '&startMinuteIntraday=' + cfg.startMin +
       '&endDateIntraday='   + enc(cfg.endDate)   + '&endHourIntraday='   + cfg.endHour  + '&endMinuteIntraday='   + cfg.endMin +
-      INTRA_TAIL;
+      '&_adjustPlanHours=on&_hideEmptyLineItems=off&_rememberViewForWarehouse=on&employmentType=AllEmployees';
   }
 
   // ── HTTP ─────────────────────────────────────────────────────────────────
@@ -79,34 +75,36 @@
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  function nthNum(row, n) {
-    var cells = row.querySelectorAll('td');
-    var count = 0;
-    for (var i = 0; i < cells.length; i++) {
-      var v = parseFloat(cells[i].textContent.trim().replace(/,/g, ''));
-      if (!isNaN(v)) { if (count === n) return v; count++; }
+  var _cachedDoc = null, _cachedHtml = null;
+  function getDoc(html) {
+    if (html !== _cachedHtml) {
+      _cachedDoc = new DOMParser().parseFromString(html, 'text/html');
+      _cachedHtml = html;
     }
-    return null;
+    return _cachedDoc;
   }
 
-  // ── Parser ───────────────────────────────────────────────────────────────
-  function parseFunctionRow(html, fnName) {
-    var doc = new DOMParser().parseFromString(html, 'text/html');
-    var tables = doc.querySelectorAll('table');
-    for (var t = 0; t < tables.length; t++) {
-      if (tables[t].textContent.toLowerCase().indexOf(fnName.toLowerCase()) < 0) continue;
-      var rows = tables[t].querySelectorAll('tr');
-      var foundFn = false;
-      for (var r = 0; r < rows.length; r++) {
-        var cells = rows[r].querySelectorAll('td');
-        if (!cells.length) continue;
-        if (rows[r].textContent.toLowerCase().indexOf(fnName.toLowerCase()) >= 0) foundFn = true;
-        if (!foundFn) continue;
-        if (cells[0].textContent.trim() !== 'Total') continue;
-        var rate  = nthNum(rows[r], 4);
-        var units = nthNum(rows[r], 3);
-        var hours = nthNum(rows[r], 0);
-        if (rate !== null) return { rate: rate, units: units, hours: hours };
+  function normLabel(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+  // Find a line-item row by its label, read the first 3 numeric cells AFTER
+  // the label cell = Actual Vol, Hrs, Rate. Reading after the label avoids
+  // "5lb"/"20lb" being mis-read as numbers and skips the (text) Unit cell.
+  function parseLineItem(html, label) {
+    var doc    = getDoc(html);
+    var target = normLabel(label);
+    var rows   = doc.querySelectorAll('tr');
+    for (var r = 0; r < rows.length; r++) {
+      var cells = rows[r].querySelectorAll('td');
+      for (var i = 0; i < cells.length; i++) {
+        var cellNorm = normLabel(cells[i].textContent);
+        if (cellNorm && cellNorm.indexOf(target) === 0) {
+          var nums = [];
+          for (var j = i + 1; j < cells.length && nums.length < 3; j++) {
+            var v = parseFloat(cells[j].textContent.trim().replace(/,/g, ''));
+            if (!isNaN(v)) nums.push(v);
+          }
+          if (nums.length === 3) return { units: nums[0], hours: nums[1], rate: nums[2] };
+        }
       }
     }
     return { rate: null, units: null, hours: null };
@@ -183,28 +181,12 @@
     if (btn) btn.disabled = true;
     try {
       var html = await httpGet(buildURL());
-      var _scp5 = parseFunctionRow(html, 'UIS_5lb_SCP_Induct');
-      var _ind5 = parseFunctionRow(html, 'UIS_5lb_Induct');
-      var _u5 = (_scp5.units || 0) + (_ind5.units || 0);
-      var _h5 = (_scp5.hours || 0) + (_ind5.hours || 0);
-      rates.uis5lb = {
-        units: _u5 || null,
-        hours: _h5 || null,
-        rate:  _scp5.rate || _ind5.rate,
-      };
-      var _scp = parseFunctionRow(html, 'UIS_20lb_SCP_Induct');
-      var _ind = parseFunctionRow(html, 'UIS_20lb_Induct');
-      var _u20 = (_scp.units || 0) + (_ind.units || 0);
-      var _h20 = (_scp.hours || 0) + (_ind.hours || 0);
-      rates.uis20lb = {
-        units: _u20 || null,
-        hours: _h20 || null,
-        rate:  _scp.rate || _ind.rate,
-      };
-      rates.manSort = parseFunctionRow(html, 'RC Sort Primary');
-      // RC Sort total vol = sum of all 3 card units
-      var _v = (rates.uis5lb.units || 0) + (rates.uis20lb.units || 0) + (rates.manSort.units || 0);
-      rcSortVol = _v || null;
+      // processPathRollup line items -> cards (Actual Vol / Hrs / Rate)
+      rates.uis5lb  = parseLineItem(html, '5lb sort');
+      rates.uis20lb = parseLineItem(html, '20lb sort');
+      rates.manSort = parseLineItem(html, 'Manual Sort - Total');
+      var _rc = parseLineItem(html, 'RC Sort - Total');
+      rcSortVol = _rc.units;
       lastUpdated = new Date();
       renderAll();
       setStatus('Updated ' + lastUpdated.toLocaleTimeString());
