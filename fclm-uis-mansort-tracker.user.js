@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM UIS / ManSort Tracker
 // @namespace    http://tampermonkey.net/
-// @version      1.3
+// @version      1.4
 // @description  Floating overlay — UIS 5LB, UIS 20LB, ManSort, RC Sort (IMO1 processPathRollup)
 // @author       Tyler
 // @updateURL    https://raw.githubusercontent.com/tytyh-cloud/tampermonkey-scripts/main/fclm-uis-mansort-tracker.user.js
@@ -359,9 +359,15 @@
     var savedX = GM_getValue('ums_posX', null);
     var savedY = GM_getValue('ums_posY', null);
     if (savedX !== null) {
+      // Clamp a stored position into the current viewport so a spot saved on a
+      // wider window / second monitor can never park the panel off-screen.
+      savedX = Math.max(0, Math.min(savedX, window.innerWidth  - 60));
+      savedY = Math.max(0, Math.min(savedY, window.innerHeight - 40));
       panel.style.left  = savedX + 'px';
       panel.style.right = 'auto';
       panel.style.top   = savedY + 'px';
+      GM_setValue('ums_posX', savedX);
+      GM_setValue('ums_posY', savedY);
     }
 
     hdr.addEventListener('mousedown', function (e) {
