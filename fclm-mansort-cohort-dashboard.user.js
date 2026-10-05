@@ -307,7 +307,7 @@
       '<div style="font-size:12px;color:#5e5e5e;margin-bottom:14px;">Cohort shift performance - auto-pulled from FCLM. Wednesdays credited to the owning crew.</div>' +
       '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;"><button class="msd-view" data-v="today">Today</button><button class="msd-view" data-v="7d">Last 7 Days</button><button class="msd-view" data-v="custom">Custom Range</button><span id="msd-custom" style="display:none;gap:8px;align-items:center;"><label style="font-size:12px;">From <input type="date" id="msd-from"></label><label style="font-size:12px;">To <input type="date" id="msd-to"></label><button id="msd-apply">Apply</button></span><div style="flex:1"></div><button id="msd-reload">Full Reload (' + CFG.rangeDays + 'd)</button><button id="msd-settings">Settings</button><button id="msd-csv">Export CSV</button></div>' +
       '<div id="msd-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>' +
-      '<div style="display:flex;align-items:center;gap:10px;margin:4px 0 10px 0;"><h3 id="msd-mtd-title" style="margin:0;font-size:14px;">Month to Date</h3><span id="msd-mtd-label" style="font-size:12px;color:#9ca3af;"></span></div>' +
+      '<div id="msd-mtd-head" style="display:flex;align-items:center;gap:10px;margin:4px 0 10px 0;"><h3 id="msd-mtd-title" style="margin:0;font-size:14px;">Month to Date</h3><span id="msd-mtd-label" style="font-size:12px;color:#9ca3af;"></span></div>' +
       '<div id="msd-mtd" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;"><div class="msd-card"><div class="msd-ct">UPH Trend by Shift</div><div id="msd-ch-uph"></div></div><div class="msd-card"><div class="msd-ct">Units by Shift</div><div id="msd-ch-units"></div></div><div class="msd-card" style="grid-column:1/-1;"><div class="msd-ct">Latest Shift Comparison - UPH</div><div id="msd-ch-cmp"></div></div><div class="msd-card" style="grid-column:1/-1;"><div class="msd-ct">Month over Month - Units and UPH</div><div id="msd-ch-month"></div></div></div>' +
       '<div class="msd-card"><div class="msd-ct">Shift Detail Log</div><div style="overflow-x:auto;"><table id="msd-table" style="width:100%;border-collapse:collapse;font-size:12px;"></table></div></div>' +
@@ -355,15 +355,23 @@
   function renderKPIs() {
     const latest = getLatestByShift(), week = getTrailing7ByShift();
     const wrap = document.getElementById('msd-kpis'); wrap.innerHTML = '';
+    const sevenDay = currentView === '7d';
+    const header = sh => '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:600;">' + sh + ' - ' + SHIFT_NAMES[sh] + '</div>';
+    const noData = sh => '<div class="msd-bar msd-bg-gray"></div>' + header(sh) + '<div style="font-size:26px;color:#9ca3af;">-</div><div style="font-size:12px;color:#9ca3af;">No data yet</div>';
+    const bigCard = (st, sh, uph, subline) => '<div class="msd-bar msd-bg-' + st + '"></div>' + header(sh) + '<div style="font-size:26px;font-weight:700;font-family:SF Mono,Consolas,monospace;" class="msd-' + st + '">' + uph + ' <span style="font-size:13px;color:#9ca3af;">UPH</span></div><div style="font-size:12px;color:#5e5e5e;">' + subline + '</div>';
     SHIFTS.forEach(sh => {
-      const d = latest[sh]; let inner;
-      if (d) {
-        const st = getStatusColor(d.uph), w = week[sh]; let wline = '';
-        if (w) { const delta = d.uph - w.uph, arrow = delta > 0 ? '+' : delta < 0 ? '-' : '', dc = delta > 0 ? '#00802f' : delta < 0 ? '#db0000' : '#9ca3af';
-          wline = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0000000f;font-size:12px;color:#5e5e5e;">7-day avg <strong class="msd-' + getStatusColor(w.uph) + '">' + w.uph + ' UPH</strong> <span style="color:' + dc + ';font-size:11px;">' + arrow + Math.abs(delta) + '</span><div style="font-size:11px;color:#9ca3af;margin-top:2px;">' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's') + '</div></div>'; }
-        inner = '<div class="msd-bar msd-bg-' + st + '"></div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:600;">' + sh + ' - ' + SHIFT_NAMES[sh] + '</div><div style="font-size:26px;font-weight:700;font-family:SF Mono,Consolas,monospace;" class="msd-' + st + '">' + d.uph + ' <span style="font-size:13px;color:#9ca3af;">UPH</span></div><div style="font-size:12px;color:#5e5e5e;">latest - ' + d.units.toLocaleString() + ' units - ' + d.hours + 'h - ' + d.date + '</div>' + wline;
+      let inner;
+      if (sevenDay) {
+        const w = week[sh];
+        inner = w ? bigCard(getStatusColor(w.uph), sh, w.uph, '7-day - ' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's')) : noData(sh);
       } else {
-        inner = '<div class="msd-bar msd-bg-gray"></div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:600;">' + sh + ' - ' + SHIFT_NAMES[sh] + '</div><div style="font-size:26px;color:#9ca3af;">-</div><div style="font-size:12px;color:#9ca3af;">No data yet</div>';
+        const d = latest[sh];
+        if (d) {
+          const st = getStatusColor(d.uph), w = week[sh]; let wline = '';
+          if (w) { const delta = d.uph - w.uph, arrow = delta > 0 ? '+' : delta < 0 ? '-' : '', dc = delta > 0 ? '#00802f' : delta < 0 ? '#db0000' : '#9ca3af';
+            wline = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0000000f;font-size:12px;color:#5e5e5e;">7-day avg <strong class="msd-' + getStatusColor(w.uph) + '">' + w.uph + ' UPH</strong> <span style="color:' + dc + ';font-size:11px;">' + arrow + Math.abs(delta) + '</span><div style="font-size:11px;color:#9ca3af;margin-top:2px;">' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's') + '</div></div>'; }
+          inner = bigCard(st, sh, d.uph, 'latest - ' + d.units.toLocaleString() + ' units - ' + d.hours + 'h - ' + d.date) + wline;
+        } else { inner = noData(sh); }
       }
       wrap.appendChild(el('div', { class: 'msd-kpi' }, inner));
     });
@@ -377,6 +385,11 @@
 
   function renderMTD() {
     const wrap = document.getElementById('msd-mtd'), label = document.getElementById('msd-mtd-label'), title = document.getElementById('msd-mtd-title');
+    const head = document.getElementById('msd-mtd-head');
+    // The Month to Date summary is redundant on the Last 7 Days tab -> hide it there.
+    if (currentView === '7d') { if (head) head.style.display = 'none'; wrap.style.display = 'none'; return; }
+    if (head) head.style.display = 'flex';
+    wrap.style.display = 'grid';
     const emptyCard = '<div class="msd-kpi"><div class="msd-bar msd-bg-gray"></div><div style="color:#9ca3af;">No data yet</div></div>';
     wrap.innerHTML = '';
     const card = (title, d, isSite) => {
