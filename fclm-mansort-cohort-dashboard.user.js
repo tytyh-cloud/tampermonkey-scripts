@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM ManSort Cohort Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Live 4-cohort (FHD/FHN/BHD/BHN) ManSort dashboard for IMO1 — auto-pulls processPathRollup per shift window, Wednesday ownership alternates, Today/Last 7 Days/Custom views, self-contained inline charts (no CDN).
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
