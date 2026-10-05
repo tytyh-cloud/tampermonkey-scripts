@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM ManSort Cohort Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.3
 // @description  Live 4-cohort (FHD/FHN/BHD/BHN) ManSort dashboard for IMO1 — auto-pulls processPathRollup per shift window, Wednesday ownership alternates, Today/Last 7 Days/Custom views, self-contained inline charts (no CDN).
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -375,12 +375,12 @@
   function refreshAll() { if (!overlay || overlay.style.display === 'none') return; renderKPIs(); renderMTD(); renderTable(); renderCharts(); }
 
   function renderKPIs() {
-    const latest = getLatestByShift(), week = getTrailing7ByShift();
+    const latest = getLatestByShift();
     const wrap = document.getElementById('msd-kpis'); wrap.innerHTML = '';
     const weekView = currentView === 'week';
-    const wr = weekView ? weekRange() : null;
-    const wk = weekView ? cohortSummaryInRange(wr.from, wr.to) : {};
-    const wlabel = weekView ? (fmtMD(wr.from) + '-' + fmtMD(wr.to)) : '';
+    const wr = weekRange();
+    const wk = cohortSummaryInRange(wr.from, wr.to);
+    const wlabel = fmtMD(wr.from) + '-' + fmtMD(wr.to);
     const header = sh => '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:600;">' + sh + ' - ' + SHIFT_NAMES[sh] + '</div>';
     const noData = sh => '<div class="msd-bar msd-bg-gray"></div>' + header(sh) + '<div style="font-size:26px;color:#9ca3af;">-</div><div style="font-size:12px;color:#9ca3af;">No data yet</div>';
     const bigCard = (st, sh, uph, subline) => '<div class="msd-bar msd-bg-' + st + '"></div>' + header(sh) + '<div style="font-size:26px;font-weight:700;font-family:SF Mono,Consolas,monospace;" class="msd-' + st + '">' + uph + ' <span style="font-size:13px;color:#9ca3af;">UPH</span></div><div style="font-size:12px;color:#5e5e5e;">' + subline + '</div>';
@@ -392,9 +392,9 @@
       } else {
         const d = latest[sh];
         if (d) {
-          const st = getStatusColor(d.uph), w = week[sh]; let wline = '';
+          const st = getStatusColor(d.uph), w = wk[sh]; let wline = '';
           if (w) { const delta = d.uph - w.uph, arrow = delta > 0 ? '+' : delta < 0 ? '-' : '', dc = delta > 0 ? '#00802f' : delta < 0 ? '#db0000' : '#9ca3af';
-            wline = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0000000f;font-size:12px;color:#5e5e5e;">7-day avg <strong class="msd-' + getStatusColor(w.uph) + '">' + w.uph + ' UPH</strong> <span style="color:' + dc + ';font-size:11px;">' + arrow + Math.abs(delta) + '</span><div style="font-size:11px;color:#9ca3af;margin-top:2px;">' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's') + '</div></div>'; }
+            wline = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #0000000f;font-size:12px;color:#5e5e5e;">last wk (' + wlabel + ') <strong class="msd-' + getStatusColor(w.uph) + '">' + w.uph + ' UPH</strong> <span style="color:' + dc + ';font-size:11px;">' + arrow + Math.abs(delta) + '</span><div style="font-size:11px;color:#9ca3af;margin-top:2px;">' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's') + '</div></div>'; }
           inner = bigCard(st, sh, d.uph, 'latest - ' + d.units.toLocaleString() + ' units - ' + d.hours + 'h - ' + d.date) + wline;
         } else { inner = noData(sh); }
       }
