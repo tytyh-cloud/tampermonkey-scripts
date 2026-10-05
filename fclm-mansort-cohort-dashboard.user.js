@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FCLM ManSort Cohort Dashboard
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Live 4-cohort (FHD/FHN/BHD/BHN) ManSort dashboard for IMO1 — auto-pulls processPathRollup per shift window, Wednesday ownership alternates, Today/Last 7 Days/Custom views, self-contained inline charts (no CDN).
 // @author       Tyler
 // @match        *://fclm-portal.amazon.com/*
@@ -168,8 +168,8 @@
       if (!customFrom || !customTo) return all.slice();
       return all.filter(d => d.date >= customFrom && d.date <= customTo);
     }
-    const cs = addDays(mx, -6);
-    return all.filter(d => d.date >= cs && d.date <= mx);
+    const wr = weekRange();
+    return all.filter(d => d.date >= wr.from && d.date <= wr.to);
   }
 
   function getStatusColor(uph) { return uph >= CFG.greenUPH ? 'green' : uph >= CFG.yellowUPH ? 'yellow' : 'red'; }
@@ -186,6 +186,28 @@
     const mx = maxDate(all), cs = addDays(mx, -6);
     SHIFTS.forEach(sh => {
       const rows = all.filter(d => d.shift === sh && d.date >= cs && d.date <= mx);
+      if (!rows.length) return;
+      const u = rows.reduce((s, r) => s + r.units, 0), h = rows.reduce((s, r) => s + r.hours, 0);
+      if (!h) return;
+      out[sh] = { uph: Math.round(u / h), units: u, hours: Math.round(h * 10) / 10, shifts: rows.length };
+    });
+    return out;
+  }
+
+  // Previous complete Sun-Sat week relative to today (local).
+  function weekRange() {
+    const n = new Date();
+    const today = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    const sun = new Date(today); sun.setDate(today.getDate() - today.getDay() - 7); // last week's Sunday
+    const sat = new Date(sun); sat.setDate(sun.getDate() + 6);
+    return { from: localStr(sun), to: localStr(sat) };
+  }
+  const fmtMD = s => { const p = s.split('-'); return (+p[1]) + '/' + (+p[2]); };
+  // volume-weighted per-cohort summary over an inclusive date range
+  function cohortSummaryInRange(from, to) {
+    const out = {}, all = records();
+    SHIFTS.forEach(sh => {
+      const rows = all.filter(d => d.shift === sh && d.date >= from && d.date <= to);
       if (!rows.length) return;
       const u = rows.reduce((s, r) => s + r.units, 0), h = rows.reduce((s, r) => s + r.hours, 0);
       if (!h) return;
@@ -305,7 +327,7 @@
     overlay.innerHTML =
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;"><h1 style="margin:0;font-size:20px;">IMO1 ManSort Cohort Dashboard</h1><span id="msd-status" style="font-size:12px;color:#9ca3af;"></span><div style="flex:1"></div><button id="msd-close" style="background:#fff;border:1px solid #0000001f;border-radius:8px;padding:8px 14px;cursor:pointer;">Close</button></div>' +
       '<div style="font-size:12px;color:#5e5e5e;margin-bottom:14px;">Cohort shift performance - auto-pulled from FCLM. Wednesdays credited to the owning crew.</div>' +
-      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;"><button class="msd-view" data-v="today">Today</button><button class="msd-view" data-v="7d">Last 7 Days</button><button class="msd-view" data-v="custom">Custom Range</button><span id="msd-custom" style="display:none;gap:8px;align-items:center;"><label style="font-size:12px;">From <input type="date" id="msd-from"></label><label style="font-size:12px;">To <input type="date" id="msd-to"></label><button id="msd-apply">Apply</button></span><div style="flex:1"></div><button id="msd-reload">Full Reload (' + CFG.rangeDays + 'd)</button><button id="msd-settings">Settings</button><button id="msd-csv">Export CSV</button></div>' +
+      '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;"><button class="msd-view" data-v="today">Today</button><button class="msd-view" data-v="week">Last Week</button><button class="msd-view" data-v="custom">Custom Range</button><span id="msd-custom" style="display:none;gap:8px;align-items:center;"><label style="font-size:12px;">From <input type="date" id="msd-from"></label><label style="font-size:12px;">To <input type="date" id="msd-to"></label><button id="msd-apply">Apply</button></span><div style="flex:1"></div><button id="msd-reload">Full Reload (' + CFG.rangeDays + 'd)</button><button id="msd-settings">Settings</button><button id="msd-csv">Export CSV</button></div>' +
       '<div id="msd-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;"></div>' +
       '<div id="msd-mtd-head" style="display:flex;align-items:center;gap:10px;margin:4px 0 10px 0;"><h3 id="msd-mtd-title" style="margin:0;font-size:14px;">Month to Date</h3><span id="msd-mtd-label" style="font-size:12px;color:#9ca3af;"></span></div>' +
       '<div id="msd-mtd" style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px;"></div>' +
@@ -355,15 +377,18 @@
   function renderKPIs() {
     const latest = getLatestByShift(), week = getTrailing7ByShift();
     const wrap = document.getElementById('msd-kpis'); wrap.innerHTML = '';
-    const sevenDay = currentView === '7d';
+    const weekView = currentView === 'week';
+    const wr = weekView ? weekRange() : null;
+    const wk = weekView ? cohortSummaryInRange(wr.from, wr.to) : {};
+    const wlabel = weekView ? (fmtMD(wr.from) + '-' + fmtMD(wr.to)) : '';
     const header = sh => '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;font-weight:600;">' + sh + ' - ' + SHIFT_NAMES[sh] + '</div>';
     const noData = sh => '<div class="msd-bar msd-bg-gray"></div>' + header(sh) + '<div style="font-size:26px;color:#9ca3af;">-</div><div style="font-size:12px;color:#9ca3af;">No data yet</div>';
     const bigCard = (st, sh, uph, subline) => '<div class="msd-bar msd-bg-' + st + '"></div>' + header(sh) + '<div style="font-size:26px;font-weight:700;font-family:SF Mono,Consolas,monospace;" class="msd-' + st + '">' + uph + ' <span style="font-size:13px;color:#9ca3af;">UPH</span></div><div style="font-size:12px;color:#5e5e5e;">' + subline + '</div>';
     SHIFTS.forEach(sh => {
       let inner;
-      if (sevenDay) {
-        const w = week[sh];
-        inner = w ? bigCard(getStatusColor(w.uph), sh, w.uph, '7-day - ' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's')) : noData(sh);
+      if (weekView) {
+        const w = wk[sh];
+        inner = w ? bigCard(getStatusColor(w.uph), sh, w.uph, wlabel + ' - ' + w.units.toLocaleString() + ' units - ' + w.hours + 'h - ' + w.shifts + ' shift' + (w.shifts === 1 ? '' : 's')) : noData(sh);
       } else {
         const d = latest[sh];
         if (d) {
@@ -386,8 +411,8 @@
   function renderMTD() {
     const wrap = document.getElementById('msd-mtd'), label = document.getElementById('msd-mtd-label'), title = document.getElementById('msd-mtd-title');
     const head = document.getElementById('msd-mtd-head');
-    // The Month to Date summary is redundant on the Last 7 Days tab -> hide it there.
-    if (currentView === '7d') { if (head) head.style.display = 'none'; wrap.style.display = 'none'; return; }
+    // The Month to Date summary is redundant on the Last Week tab -> hide it there.
+    if (currentView === 'week') { if (head) head.style.display = 'none'; wrap.style.display = 'none'; return; }
     if (head) head.style.display = 'flex';
     wrap.style.display = 'grid';
     const emptyCard = '<div class="msd-kpi"><div class="msd-bar msd-bg-gray"></div><div style="color:#9ca3af;">No data yet</div></div>';
@@ -490,5 +515,5 @@
   function init() { if (document.getElementById('msd-launch')) return; buildLauncher(); buildOverlay(); startAuto(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 
-  if (typeof module !== 'undefined') module.exports = { windowsForDate, wednesdayOwner, getFilteredData, lineChart, groupedBarChart, comparisonChart, computeMonthData, getLatestByShift, getTrailing7ByShift, _setStore: s => { store = s; }, _setView: (v, f, t) => { currentView = v; customFrom = f; customTo = t; }, CFG };
+  if (typeof module !== 'undefined') module.exports = { windowsForDate, wednesdayOwner, getFilteredData, lineChart, groupedBarChart, comparisonChart, computeMonthData, getLatestByShift, getTrailing7ByShift, weekRange, cohortSummaryInRange, _setStore: s => { store = s; }, _setView: (v, f, t) => { currentView = v; customFrom = f; customTo = t; }, CFG };
 })();
